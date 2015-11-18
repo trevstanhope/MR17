@@ -1,4 +1,16 @@
-//
+/*
+  TSC.ino
+  Transmission System Controller
+*/
+
+// Libraries
+#include <RunningMedian.h>
+#include <Canbus.h>
+#include <mcp2515.h>
+#include <global.h>
+#include <defaults.h>
+#include <mcp2515_defs.h>
+// #include <DualVNH5019MotorShield.h>
 
 // Constants
 const int BAUD = 9600;
@@ -10,6 +22,7 @@ const int INTERVAL = 1000;
 const int OUTPUT_LENGTH = 256;
 const int DATA_LENGTH = 128;
 const char PID[] = {"TSC"};
+unsigned int CID = 0x0756; // This is the devices ID. The Lower the Number, the Higher its Priority on the CAN Bus. ID 0x0000 would be the highest Priority. (Cant have two with the same ID)
 
 // Variables
 volatile int counter_engine = 0;
@@ -21,12 +34,15 @@ int freq_shaft;
 char output_buffer[OUTPUT_LENGTH];
 char data_buffer[DATA_LENGTH];
 int chksum; 
+unsigned char input_buffer[8];
+boolean can_status = false;
 
 // Setup
 void setup() {
   Serial.begin(BAUD);
-  attachInterrupt(digitalPinToInterrupt(ENGINE_RPM_PIN), increment_engine, RISING);
-  attachInterrupt(digitalPinToInterrupt(SHAFT_RPM_PIN), increment_shaft, RISING);
+  //can_status = Canbus.init(CANSPEED_500);
+  attachInterrupt(0, increment_engine, RISING);
+  attachInterrupt(1, increment_shaft, RISING);
 }
 
 // Loop
@@ -39,6 +55,8 @@ void loop() {
   sprintf(data_buffer, "{\"shaft\":%d,\"engine\":%d}", freq_shaft, freq_engine);
   chksum = checksum(data_buffer);
   sprintf(output_buffer, "{\"data\":%s,\"pid\":\"%s\",\"chksum\":%d}", data_buffer, PID, chksum);
+  input_buffer[0] = 10; // We want this message to be picked up by device with a PID of 10
+  // Canbus.message_tx(CID, input_buffer);
   Serial.println(output_buffer);
 }
 
