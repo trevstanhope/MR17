@@ -37,7 +37,7 @@ void setup() {
 void loop() {
   sprintf(data_buffer, "{\"wheel\":%d,\"steer\":%d,\"susp\":%d}", 0, 0, 0);
   chksum = checksum(data_buffer);
-  sprintf(output_buffer, "{\"data\":%s,\"pid\":\"%s\",\"chksum\":%d}", data_buffer, UID, chksum);
+  sprintf(output_buffer, "{\"data\":%s,\"pid\":\"%s\",\"chksum\":%d}", data_buffer, PID, chksum);
   Serial.println(output_buffer);
 }
 
