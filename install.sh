@@ -4,7 +4,7 @@
 # DISCLAIMER: This software is distributed with no warranty.
 
 INSTALL_PATH="$PWD"
-CONFIG_PATH="$PWD/configs"
+CONFIG_PATH="$PWD/conf"
 BIN_PATH="$PWD/bin"
 BUILD_PATH="$PWD/build"
 
@@ -19,6 +19,9 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
         echo "Aborting..."
 fi
+
+# Update APT
+
 
 # GRUB
 read -p "Enable fast GRUB? [y/n] " ans
@@ -38,11 +41,15 @@ read -p "Setup default network? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Reconfiguring Network Interfaces..."
-        apt-get install isc-dhcp-server
+        apt-get install dnsmasq hostapd -y -qq
+	#apt-get install isc-dhcp-server -y -qq
         cp $CONFIG_PATH/iwlwifi-3160-14.ucode /lib/firmware/
         cp $CONFIG_PATH/interfaces /etc/network
-        cp $CONFIG_PATH/dhclient.conf /etc/dhcp/
-        cp $CONFIG_PATH/dhcpd.conf /etc/dhcp/
+	cp $CONFIG_PATH/hostapd.conf /etc/hostapd/
+	cp $CONFIG_PATH/dnsmasq.conf /etc/
+        #cp $CONFIG_PATH/dhclient.conf /etc/dhcp/
+        #cp $CONFIG_PATH/dhcpd.conf /etc/dhcp/
+
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
