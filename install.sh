@@ -20,58 +20,6 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
         echo "Aborting..."
 fi
 
-# Settings File
-read -p "Create settings.cfg [y/n]? " ans
-if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
-    then
-        read -p "Enter the relative path to the settings file: " ans
-        echo $ans > settings.cfg
-fi
-if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
-    then
-        echo "Aborting..."
-fi
-
-
-# LightDM
-read -p "Do you want to disable LightDM [y/n]? " ans
-if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
-    then
-        echo "Removing LightDM..."
-        update-rc.d -f lightdm remove || service lightdm remove
-fi
-if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
-    then
-        echo "Aborting..."
-fi
-
-# Mouse
-read -p "Disable on-screen mouse [y/n]? " ans
-if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
-    then     
-        echo "Disabling Mouse ..."
-        apt-get install unclutter
-        cp $CONFIG_PATH/unclutter /etc/default/
-fi
-if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
-    then
-        echo "Aborting..."
-fi
-
-# Boot
-read -p "Start AgriVision on boot? [y/n] " ans
-if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
-    then
-        echo "Installing to Boot Path..."
-        cp $BIN_PATH/rc.local /etc/
-        chmod +x /etc/rc.local
-        cp configs/Agri-Vision.desktop /root/.config/autostart
-fi
-if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
-    then
-        echo "Aborting..."
-fi
-
 # GRUB
 read -p "Enable fast GRUB? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
@@ -159,7 +107,9 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install libblas-dev -y -qq
         apt-get install liblapack-dev -y -qq
         apt-get install cython -y -qq
-	apt-get install libzmq -y -qq
+	apt-get install libzmq3 -y -qq
+	apt-get install hostapd -y -qq
+	apt-get install dnsmasq -y -qq
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -171,7 +121,6 @@ read -p "Update Pip modules? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Installing Python modules..."
-	pip install scipy --upgrade
         pip install -r requirements.txt
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
