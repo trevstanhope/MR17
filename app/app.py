@@ -50,7 +50,7 @@ class App:
         return chksum % mod
     
     ## Initialize OBD
-    def init_obd(self, device='/dev/ttyACM0', baud=9600):
+    def init_obd(self, device='/dev/ttyUSB0', baud=9600):
         try:
             self.obd = serial.Serial(device, baud)
         except Exception as e:
