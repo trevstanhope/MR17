@@ -42,8 +42,10 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Reconfiguring Network Interfaces..."
         apt-get install dnsmasq hostapd -y -qq
+	apt-get install firmware-iwlwifi -y -qq
+	apt-get install wireless-tools -y -qq
 	#apt-get install isc-dhcp-server -y -qq
-        cp $CONFIG_PATH/iwlwifi-3160-14.ucode /lib/firmware/
+        #cp $CONFIG_PATH/iwlwifi-3160-14.ucode /lib/firmware/
         cp $CONFIG_PATH/interfaces /etc/network
 	cp $CONFIG_PATH/hostapd.conf /etc/hostapd/
 	cp $CONFIG_PATH/dnsmasq.conf /etc/

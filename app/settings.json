@@ -1,5 +1,5 @@
 {
-    "CHERRYPY_ADDR": "0.0.0.0", 
-    "CHERRYPY_PATH": "agionic/www/", 
-    "CHERRYPY_PORT": 8080
+    "CHERRYPY_ADDR" : "0.0.0.0", 
+    "CHERRYPY_PATH" : "agionic/www/", 
+    "CHERRYPY_PORT" : 8080
 }

@@ -70,7 +70,14 @@ class App:
             print self.mongo_client
         except Exception as e:
             raise e
-                    
+
+    ## Render Webapp
+    @cherrypy.expose 
+    def index(self, www_dir="www", index_file="index.html"):
+	path = os.path.join(www_dir, index_file)
+        with open(path) as html: 
+            return html.read()
+	
     ## Handle API Requests
     @cherrypy.expose
     def default(self, *args, **kwargs):
@@ -88,7 +95,6 @@ if __name__ == '__main__':
     cherrypy.server.socket_port = 8080
     currdir = os.path.dirname(os.path.abspath(__file__))
     conf = {
-        '/': {'tools.staticdir.on':True, 'tools.staticdir.dir':os.path.join(currdir,'static')},
-        '/data': {'tools.staticdir.on':True, 'tools.staticdir.dir':os.path.join(currdir,'data')},
+        '/': {'tools.staticdir.on':True, 'tools.staticdir.dir':os.path.join(currdir,'www')},
     }
     cherrypy.quickstart(app, '/', config=conf)
