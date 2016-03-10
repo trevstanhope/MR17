@@ -17,11 +17,20 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
-        echo "Aborting..."
+        echo "Skipping..."
 fi
 
 # Update APT
-
+read -p "Configure APT [y/n] " ans
+if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
+    then
+        cp $CONFIG_PATH/sources.list /etc/apt/
+        apt-get update
+fi
+if [$ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO]
+    then
+        echo "Skipping..."
+fi
 
 # GRUB
 read -p "Enable fast GRUB? [y/n] " ans
@@ -44,14 +53,9 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install dnsmasq hostapd -y -qq
 	apt-get install firmware-iwlwifi -y -qq
 	apt-get install wireless-tools -y -qq
-	#apt-get install isc-dhcp-server -y -qq
-        #cp $CONFIG_PATH/iwlwifi-3160-14.ucode /lib/firmware/
         cp $CONFIG_PATH/interfaces /etc/network
 	cp $CONFIG_PATH/hostapd.conf /etc/hostapd/
 	cp $CONFIG_PATH/dnsmasq.conf /etc/
-        #cp $CONFIG_PATH/dhclient.conf /etc/dhcp/
-        #cp $CONFIG_PATH/dhcpd.conf /etc/dhcp/
-
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
