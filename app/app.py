@@ -103,7 +103,7 @@ class App:
         """ This function the API """
         try:
             print kwargs
-            return self._last #return json.dumps(self.session.find().limit(1).sort({"$natural":-1}))
+            return json.dumps(self._last) #return json.dumps(self.session.find().limit(1).sort({"$natural":-1}))
         except Exception as e:
             raise e
         return None

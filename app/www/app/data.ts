@@ -25,7 +25,7 @@ module app {
     request.addEventListener("error", TransferFailed);
     request.addEventListener("abort", TransferCanceled);
 
-    request.open("GET", "test.json");
+    request.open("GET", "http://192.168.1.2:8080");
     request.send();
   }
 

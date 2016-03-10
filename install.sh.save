@@ -67,7 +67,7 @@ read -p "Update APT dependencies? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Installing dependencies via mirror ..."
-        apt-get update
+        
         apt-get upgrade -y -qq
         apt-get install unzip -y -qq
         apt-get install build-essential -y -qq
@@ -161,22 +161,6 @@ fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
         echo "Aborting..."
-fi
-
-# Create Daemon
-read -p "Start Daemon on boot? [y/n] " ans
-if [$ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
-    then
-        echo "Adding daemon to init.d"
-        cp $CONFIG_PATH/mutrac /etc/init.d/
-        chmod +x /etc/init.d/mutrac
-        chown root:root /etc/init.d/mutrac
-        update-rc.d mutrac defaults
-        update-rc.d mutrac enable
-fi
-if [$ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
-    then
-        echo "Skipping..."
 fi
 
 # Done Message
