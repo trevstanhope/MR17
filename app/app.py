@@ -17,6 +17,7 @@ from pymongo import MongoClient
 import numpy as np
 import sys, os
 import serial
+import binascii
 
 class App:
     def __init__(self, config_file):
@@ -28,32 +29,6 @@ class App:
             self.init_obd()
         except Exception as e:
             raise(e)
-
-    ## Listen
-    def listen(self):
-        try:
-            s = self.obd.readline()
-            j = json.loads(s)
-            d = j['data'] # grab data component of string
-            n = j['chksum'] # parse checksum
-            c = self.checksum(d) # calculate checksum
-            print s
-            print c, n
-        except Exception as e:
-            print str(e)
-        
-    def checksum(self, d, mod=256, decimals=2):
-        chksum = 0
-        d = {k.encode('ascii'): v for (k, v) in d.iteritems()}
-        for k,v in d.iteritems():
-            if v is float:
-                d[k] = round(v,decimals)
-        s = str(d)
-        r = s.replace(' ', '').replace('\'', '\"')
-        print r
-        for i in r:
-            chksum += ord(i)
-        return chksum % mod
     
     ## Initialize OBD
     def init_obd(self, device_classes=['/dev/ttyUSB','/dev/ttyACM'], attempts=5, baud=9600):
@@ -70,19 +45,50 @@ class App:
         print dev_id
             
     ## Initialize Tasks
-    def init_tasks(self, listen_interval=0.001):
+    def init_tasks(self, listen_interval=0.1):
         try:
             Monitor(cherrypy.engine, self.listen, frequency=listen_interval).subscribe()
         except Exception as e:
             raise e
             
     ## Initialize MongoDB
-    def init_db(self, addr='127.0.0.1', port=27019):
+    def init_db(self, addr='127.0.0.1', port=27019, key_len=15, sessions_db="sessions"):
         try:
             self.mongo_client = MongoClient()
-            print self.mongo_client
+            self.db = self.mongo_client[sessions_db]
+            self.session_key = binascii.b2a_hex(os.urandom(key_len))
+            self.session = self.db[self.session_key]
         except Exception as e:
             raise e
+
+    ## Listen
+    def listen(self):
+        try:
+            s = self.obd.readline()
+            j = json.loads(s)
+            d = j['data'] # grab data component of string
+            chk_a = int(j['chksum']) # parse checksum
+            chk_b = self.checksum(d) # calculate checksum
+            if chk_a == chk_b:
+                self._last = d
+                print self._last
+                #self.session.insert(d)
+            else:
+                "BAD"
+        except Exception as e:
+            print str(e)
+        
+    def checksum(self, d, mod=256, decimals=2):
+        chksum = 0
+        d = {k.encode('ascii'): v for (k, v) in d.iteritems()}
+        for k,v in d.iteritems():
+            if v is float:
+                d[k] = round(v,decimals)
+        s = str(d)
+        r = s.replace(' ', '').replace('\'', '\"')
+        for i in r:
+            chksum += ord(i)
+        return chksum % mod
 
     ## Render Webapp
     @cherrypy.expose 
@@ -97,6 +103,7 @@ class App:
         """ This function the API """
         try:
             print kwargs
+            return self._last #return json.dumps(self.session.find().limit(1).sort({"$natural":-1}))
         except Exception as e:
             raise e
         return None
