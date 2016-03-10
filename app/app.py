@@ -37,24 +37,37 @@ class App:
             d = j['data'] # grab data component of string
             n = j['chksum'] # parse checksum
             c = self.checksum(d) # calculate checksum
+            print s
+            print c, n
         except Exception as e:
             print str(e)
         
-    def checksum(self, d, mod=256):
+    def checksum(self, d, mod=256, decimals=2):
         chksum = 0
         d = {k.encode('ascii'): v for (k, v) in d.iteritems()}
+        for k,v in d.iteritems():
+            if v is float:
+                d[k] = round(v,decimals)
         s = str(d)
         r = s.replace(' ', '').replace('\'', '\"')
+        print r
         for i in r:
             chksum += ord(i)
         return chksum % mod
     
     ## Initialize OBD
-    def init_obd(self, device='/dev/ttyUSB0', baud=9600):
-        try:
-            self.obd = serial.Serial(device, baud)
-        except Exception as e:
-            raise e
+    def init_obd(self, device_classes=['/dev/ttyUSB','/dev/ttyACM'], attempts=5, baud=9600):
+        self.obd = None
+        for i in range(attempts):
+            for dev in device_classes:
+                try:
+                    dev_id = dev + str(i)
+                    self.obd = serial.Serial(dev_id, baud)
+                    break
+                except Exception as e:
+                    print str(e)
+            if self.obd is not None: break
+        print dev_id
             
     ## Initialize Tasks
     def init_tasks(self, listen_interval=0.001):
@@ -89,7 +102,8 @@ class App:
         return None
 
 if __name__ == '__main__':
-    config_file = sys.argv[1]
+    config_file = "settings.json"
+    template = "packet.tmpl"
     app = App(config_file)
     cherrypy.server.socket_host = "0.0.0.0"
     cherrypy.server.socket_port = 8080
