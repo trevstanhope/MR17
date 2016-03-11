@@ -27,7 +27,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         cp $CONFIG_PATH/sources.list /etc/apt/
         apt-get update
 fi
-if [$ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO]
+if [$ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
         echo "Skipping..."
 fi
@@ -165,7 +165,7 @@ fi
 
 # Create Daemon
 read -p "Start Daemon on boot? [y/n] " ans
-if [$ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
+if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Adding daemon to init.d"
         cp $CONFIG_PATH/mutrac /etc/init.d/
