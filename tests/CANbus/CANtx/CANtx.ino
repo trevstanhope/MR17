@@ -16,9 +16,14 @@ void setup() {
 }
 
 void loop() {
-  Serial.println(millis());
   RX_Buff[0] = 10; // We want this message to be picked up by device with a PID of 10
-  RX_Buff[1] = 512; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[1] = 1 + millis() % 256; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[2] = 2 + millis() % 256; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[3] = 3 + millis() % 256; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[4] = 4 + millis() % 256; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[5] = 5 + millis() % 256; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[6] = 6 + millis() % 256; // This is the brightness level we want our LED set to on the other device
+  RX_Buff[7] = 7 + millis() % 256; // This is the brightness level we want our LED set to on the other device
   Canbus.message_tx(_ID, RX_Buff); // Send the message on the CAN Bus to be picked up by the other devices
   delay(10); 
 }

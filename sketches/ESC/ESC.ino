@@ -7,10 +7,13 @@
  */
 
 /* --- LIBRARIES --- */
+
 #include "DualVNH5019MotorShield.h"
 #include "DallasTemperature.h"
 #include "OneWire.h"
 #include <RunningMedian.h>
+#include <Canbus.h>
+#include <ArduinoJson.h>
 
 /* --- Global Constants --- */
 /// Digital Pins
@@ -65,7 +68,6 @@ const int RIGHT_BRAKE_PIN = A3;
 
 /* --- Global Settings --- */ 
 /// CMQ
-const char PID[] = "ESC";
 const int BAUD = 9600;
 const int OUTPUT_SIZE = 512;
 const int DATA_SIZE = 256;
@@ -364,7 +366,7 @@ void loop() {
   
   // Output to USB Serial
   sprintf(data_buffer, "{'run_mode':%d,'display_mode':%d,'right_brake':%d,'left_brake':%d,'cvt_guard':%d,'button':%d,'seat':%d,'hitch':%d,'ignition':%d,'rfid':%d,'cart_mode':%d,'cart_fwd':%d,'cart_bwd':%d,'throttle':%d,'trigger':%d,'pull_mode':%d}", run_mode, display_mode, right_brake, left_brake, cvt_guard, button_kill, seat_kill, hitch_kill, ignition, rfid_auth, CART_MODE, CART_FORWARD, CART_BACKWARD, THROTTLE, trigger_kill, pull_mode);
-  sprintf(output_buffer, "{\"pid\":\"%s\",\"data\":%s,\"chksum\":%d}", PID, data_buffer, checksum(data_buffer));
+  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
   Serial.println(output_buffer);
   Serial.flush();
 }

@@ -6,77 +6,77 @@
 // Libraries
 #include <Canbus.h>
 #include <ArduinoJson.h>
-#include <mcp2515.h>
-#include <global.h>
-#include <defaults.h>
-#include <mcp2515_defs.h>
 #include <RunningMedian.h>
 
-// Constants
+// Common Constants
 const int BAUD = 9600;
 const int OUTPUT_LENGTH = 256;
 const int DATA_LENGTH = 256;
 const int JSON_LENGTH = 512;
 const int INPUT_LENGTH = 256;
-const char UID[] = "ODB";
+const int CANBUS_LENGTH = 8;
+unsigned char ESC_ID = 10; // This is the ID we will use to check if the message was for this device.
+unsigned char TSC_ID = 11; // This is the ID we will use to check if the message was for this device.
+unsigned char VDC_ID = 12; // This is the ID we will use to check if the message was for this device.
+
+// Unique Constants 
 
 // Variables
+int chksum; 
+
+// Buffers
 char output_buffer[OUTPUT_LENGTH];
 char data_buffer[DATA_LENGTH];
-char input_buffer[INPUT_LENGTH] = {'\0'};
+unsigned char canbus_rx_buffer[CANBUS_LENGTH];  // Buffer to store the incoming data
+unsigned char canbus_tx_buffer[CANBUS_LENGTH];  // Buffer to store the incoming data
+
+// JSON
 StaticJsonBuffer<JSON_LENGTH> json_buffer;
 JsonObject& root = json_buffer.createObject();
-int chksum; 
 
 // Setup
 void setup() {
   Serial.begin(BAUD);
+  delay(10);
+  Canbus.init(CANSPEED_500); /* Initialise MCP2515 CAN controller at the specified speed */
+  delay(10);
 }
 
 // Loop
 void loop() {
-
-  // Update values
-  float cvt_ratio = 0.0;
-  int cvt_slip = 0;
-  int rpm = 0;
-  int throttle = 0;
-  int load = 0;
-  int eng_rpm = 0;
-  int eng_temp = 0;
-  int susp = 0;
-  float oil = 0;
-  int ballast  = 0;
-  int lbrake = 0;
-  int rbrake = 0;
-  float bat = 0;
-  int gear = 0;
-  int user = 0;
-  int lock = 0;
-  int trans_temp = 0;
   
-  // Create Output JSON with ArduinoJSON;
-  root["cvt"] = cvt_ratio;
-  root["rpm"] = rpm;
-  root["throttle"] = throttle;
-  root["load"] = load;
-  root["eng_temp"] = eng_temp;
-  root["oil"] = oil;
-  root["susp"] = susp;
-  root["ballast"] = ballast;
-  root["lbrake"] = lbrake;
-  root["rbrake"] = rbrake;
-  root["bat"] = bat;
-  root["user"] = user;
-  root["lock"] = lock;
-  root["gear"] = gear;
-  root["cvt_slip"] = cvt_slip;
-  root["trans_temp"] = trans_temp;
+  // Check CANBus
+  unsigned int _UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
+  int _ID = canbus_rx_buffer[0];
+  
+  if (_ID == ESC_ID) { // If we do, check to see if the PID matches this device
+    // Create Output JSON with ArduinoJSON;
+    root["throttle"] = canbus_rx_buffer[1];
+    root["load"] = canbus_rx_buffer[2];
+    root["eng_temp"] = canbus_rx_buffer[3];
+    root["oil"] = canbus_rx_buffer[4];
+    root["lbrake"] = canbus_rx_buffer[5];
+    root["rbrake"] = canbus_rx_buffer[6];
+    root["bat"] = canbus_rx_buffer[7];
+    root["user"] = canbus_rx_buffer[6];
+  }
+  else if (_ID == VDC_ID) {
+    root["ballast"] = canbus_rx_buffer[1];
+    root["susp"] = canbus_rx_buffer[2];
+  }
+  else if (_ID == TSC_ID) {
+    root["gear"] = canbus_rx_buffer[1];
+    root["cvt_slip"] = canbus_rx_buffer[2];
+    root["trans_temp"] = canbus_rx_buffer[3];
+    root["cvt"] = canbus_rx_buffer[4];
+    root["rpm"] = canbus_rx_buffer[5];
+    root["lock"] = canbus_rx_buffer[6];
+  }
   root.printTo(data_buffer, sizeof(data_buffer));
   
-  // Create Output JSON manually
-  chksum = checksum(data_buffer);
-  sprintf(output_buffer, "{\"data\":%s,\"pid\":\"%s\",\"chksum\":%d}", data_buffer, UID, chksum);
+  // Send JSON to Serial
+  int chksum = checksum(data_buffer);
+  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, chksum);
   Serial.println(output_buffer);
 }
 
