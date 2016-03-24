@@ -48,6 +48,7 @@ void loop() {
   // Check CANBus
   unsigned int _UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
   int _ID = canbus_rx_buffer[0];
+  Serial.println(_ID);
   
   if (_ID == ESC_ID) { // If we do, check to see if the PID matches this device
     // Create Output JSON with ArduinoJSON;

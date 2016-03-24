@@ -74,6 +74,7 @@ void loop() {
   int I = STEERING_I_GAIN * steering_error.getAverage();
   int D = STEERING_D_GAIN * (steering_error.getHighest() - steering_error.getLowest());
   //motors.setM1Speed(P+I+D);
+  //motors.setM2Speed();
   
   // CANBus
   canbus_tx_buffer[0] = VDC_ID;
