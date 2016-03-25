@@ -1,6 +1,7 @@
 #ifndef	DEFAULTS_H
 #define	DEFAULTS_H
 
+/* (Un)comment to select the board type */
 #define UNO
 //#define MEGA
 
@@ -14,7 +15,7 @@
 	LED2_LOW	-->		B,0 on Mega2560; B,0 on atmega328
 */
 
-#ifdef UNO
+#if defined(UNO)
 	#define	P_MOSI				B,3
 	#define	P_MISO				B,4
 	#define	P_SCK				B,5
@@ -22,17 +23,16 @@
 	#define	MCP2515_INT			D,2
 	#define LED2_HIGH			B,0
 	#define LED2_LOW			B,0
-#endif
-
-#ifdef MEGA
+#elif defined(MEGA)
 	#define	P_MOSI				B,2
 	#define	P_MISO				B,3
 	#define	P_SCK				B,1
 	#define	MCP2515_CS			B,0
-	#define	MCP2515_INT			E,4
+	#define	MCP2515_INT			D,0 // Working on E,4 (Pin #2)
 	#define LED2_HIGH			H,5
 	#define LED2_LOW			H,5
+#else
+	#error "Modify defaults.h to select Arduino BOARD TYPE"
 #endif
 
 #endif	// DEFAULTS_H
-

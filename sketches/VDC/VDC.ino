@@ -66,23 +66,29 @@ void setup() {
 
 // Loop
 void loop() {
+
+  // Steering
   int wheel = analogRead(WHEEL_PIN);
-  int susp = analogRead(SUSP_PIN);
   int steer = analogRead(STEER_PIN);
   steering_error.add(steer-wheel);
   int P = STEERING_P_GAIN * steer-wheel;
   int I = STEERING_I_GAIN * steering_error.getAverage();
   int D = STEERING_D_GAIN * (steering_error.getHighest() - steering_error.getLowest());
-  //motors.setM1Speed(P+I+D);
-  //motors.setM2Speed();
+  int steering_output = P+I+D;
+  //motors.setM1Speed(steering_output);
+
+  // Ballast
+  int susp = analogRead(SUSP_PIN);
+  int ballast_output = 0;
+  //motors.setM2Speed(ballast_output);
   
   // CANBus
   canbus_tx_buffer[0] = VDC_ID;
-  canbus_tx_buffer[1] = wheel;
-  canbus_tx_buffer[2] = susp;
-  canbus_tx_buffer[3] = steer;
-  canbus_tx_buffer[4] = 0;
-  canbus_tx_buffer[5] = 0;
+  canbus_tx_buffer[1] = map(wheel, 0, 1024, 0, 255);
+  canbus_tx_buffer[2] = map(steer, 0, 1024, 0, 255);
+  canbus_tx_buffer[3] = map(steering_output, -400, 400, 0, 255); // M1 output
+  canbus_tx_buffer[4] = map(susp, 0, 1024, 0, 255);
+  canbus_tx_buffer[5] = map(ballast_output, -400, 400, 0, 255); // M2 output
   canbus_tx_buffer[6] = 0;
   canbus_tx_buffer[7] = 0;
   Canbus.message_tx(_PID, canbus_tx_buffer);
