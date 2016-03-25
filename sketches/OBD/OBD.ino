@@ -23,6 +23,7 @@ unsigned char VDC_ID = 12; // This is the ID we will use to check if the message
 
 // Variables
 int chksum; 
+int canbus_ok;
 
 // Buffers
 char output_buffer[OUTPUT_LENGTH];
@@ -38,47 +39,52 @@ JsonObject& root = json_buffer.createObject();
 void setup() {
   Serial.begin(BAUD);
   delay(10);
-  Canbus.init(CANSPEED_500); /* Initialise MCP2515 CAN controller at the specified speed */
+  /* Initialise MCP2515 CAN controller at the specified speed */
+  canbus_ok = Canbus.init(CANSPEED_500);
   delay(10);
 }
 
 // Loop
 void loop() {
+  delay(500);
   
   // Check CANBus
-  unsigned int _UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
-  int _ID = canbus_rx_buffer[0];
-  Serial.println(_ID);
-  
-  if (_ID == ESC_ID) { // If we do, check to see if the PID matches this device
-    // Create Output JSON with ArduinoJSON;
-    root["throttle"] = canbus_rx_buffer[1];
-    root["load"] = canbus_rx_buffer[2];
-    root["eng_temp"] = canbus_rx_buffer[3];
-    root["oil"] = canbus_rx_buffer[4];
-    root["lbrake"] = canbus_rx_buffer[5];
-    root["rbrake"] = canbus_rx_buffer[6];
-    root["bat"] = canbus_rx_buffer[7];
-    root["user"] = canbus_rx_buffer[6];
+  if (canbus_ok) {
+    unsigned int _UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
+    int _ID = canbus_rx_buffer[0];
+    if (_ID == ESC_ID) { // If we do, check to see if the PID matches this device
+      // Create Output JSON with ArduinoJSON;
+      root["throttle"] = canbus_rx_buffer[1];
+      root["load"] = canbus_rx_buffer[2];
+      root["eng_temp"] = canbus_rx_buffer[3];
+      root["oil"] = canbus_rx_buffer[4];
+      root["lbrake"] = canbus_rx_buffer[5];
+      root["rbrake"] = canbus_rx_buffer[6];
+      root["bat"] = canbus_rx_buffer[7];
+      root["user"] = canbus_rx_buffer[6];
+    }
+    else if (_ID == VDC_ID) {
+      root["ballast"] = canbus_rx_buffer[1];
+      root["susp"] = canbus_rx_buffer[2];
+    }
+    else if (_ID == TSC_ID) {
+      root["gear"] = canbus_rx_buffer[1];
+      root["cvt_slip"] = canbus_rx_buffer[2];
+      root["trans_temp"] = canbus_rx_buffer[3];
+      root["cvt"] = canbus_rx_buffer[4];
+      root["rpm"] = canbus_rx_buffer[5];
+      root["lock"] = canbus_rx_buffer[6];
+    }
+    root.printTo(data_buffer, sizeof(data_buffer));
+    
+    // Send JSON to Serial
+    int chksum = checksum(data_buffer);
+    sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d}", data_buffer, chksum, _ID);
+    Serial.println(output_buffer);
   }
-  else if (_ID == VDC_ID) {
-    root["ballast"] = canbus_rx_buffer[1];
-    root["susp"] = canbus_rx_buffer[2];
+  else {
+    Serial.println("CANBUS FAILED");
   }
-  else if (_ID == TSC_ID) {
-    root["gear"] = canbus_rx_buffer[1];
-    root["cvt_slip"] = canbus_rx_buffer[2];
-    root["trans_temp"] = canbus_rx_buffer[3];
-    root["cvt"] = canbus_rx_buffer[4];
-    root["rpm"] = canbus_rx_buffer[5];
-    root["lock"] = canbus_rx_buffer[6];
-  }
-  root.printTo(data_buffer, sizeof(data_buffer));
-  
-  // Send JSON to Serial
-  int chksum = checksum(data_buffer);
-  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, chksum);
-  Serial.println(output_buffer);
 }
 
 // Checksum

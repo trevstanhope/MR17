@@ -18,20 +18,23 @@ unsigned char JSON_Buff[256];
 void setup() {
   Serial.begin(BAUD); // For debug use
   Serial.println("CAN RX");  
-  Canbus.init(CANSPEED_500);  /* Initialise MCP2515 CAN controller at the specified speed */
+  while (!Canbus.init(CANSPEED_250)) {
+    Serial.println("CAN Failed! Retrying ...");  /* Initialise MCP2515 CAN controller at the specified speed */
+  }
 }
 
 void loop() {
   unsigned int ID = Canbus.message_rx(RX_Buff); // Check to see if we have a message on the Bus
+  root["id"] = ID;
   if (RX_Buff[0] == _PID) { // If we do, check to see if the PID matches this device
-    root["a"] = RX_Buff[1];
+    root["id"] = RX_Buff[1];
     root["b"] = RX_Buff[2];
     root["c"] = RX_Buff[3];
     root["d"] = RX_Buff[4];
     root["e"] = RX_Buff[5];
     root["f"] = RX_Buff[6];
     root["g"] = RX_Buff[7];
-    root.printTo(Serial); 
-    Serial.println();   
   }
+  root.printTo(Serial); 
+  Serial.println();
 }
