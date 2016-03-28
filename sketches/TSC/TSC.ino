@@ -36,7 +36,7 @@ const int SAMPLES = 3;
 const int INTERVAL = 50;
 unsigned int _PID = 0x0002;
 const float P_COEF = -3.0;
-const float I_COEF = 0.0;
+const float I_COEF = -3.0;
 const float D_COEF = 0.0;
 
 // Variables
@@ -89,8 +89,8 @@ void loop() {
 
   // Read Sensors
   delay(INTERVAL);
-  freq_engine = int(ENGINE_BLIPS * 60 / (engine_b - engine_a));
-  freq_shaft = int(SHAFT_BLIPS * 60 / (shaft_b - shaft_a));
+  freq_engine = int(60000 / ( ENGINE_BLIPS * (engine_b - engine_a)));
+  freq_shaft = int(60000 / (SHAFT_BLIPS * (shaft_b - shaft_a)));
   freq_wheel = 0;
   cvt_pos_last = cvt_pos;
   cvt_pos = map(analogRead(CVT_POSITION_PIN), CVT_POSITION_MIN, CVT_POSITION_MAX, 0, 255);
@@ -103,9 +103,10 @@ void loop() {
     int I = I_COEF * error.getAverage();
     int D = D_COEF * ((cvt_pos - cvt_pos_last) - cvt_target);
     int speed = P + I + D;
-    if (speed > CVT_SPEED_MIN) {
-      motors.setM1Speed(speed);
-    }
+    motors.setM1Speed(speed);
+  }
+  else {
+    Serial.println("MOTOR FAULT");
   }
   
   // CANBus
@@ -136,7 +137,9 @@ void loop() {
       while (Serial.available() > 0) {
         Serial.read();
       }
-      cvt_target = input["target"];
+      if (input.success()) {
+        cvt_target = input["target"];
+      }
     }
     output["shaft"] = freq_shaft;
     output["engine"] = freq_engine;
