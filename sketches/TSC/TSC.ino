@@ -21,10 +21,12 @@ unsigned char TSC_ID = 11;
 unsigned char VDC_ID = 12;
 
 // Unique Constants
+const bool USE_TIMER = false;
+const bool USE_COUNTER = true;
 const int ENGINE_RPM_PIN = 19;
 const int SHAFT_RPM_PIN = 18;
 // 21 is reserved for CANBUS
-const int ENGINE_BLIPS = 8;
+const int ENGINE_BLIPS = 16;
 const int SHAFT_BLIPS = 8;
 const int CVT_POSITION_PIN = 3;
 const int GEAR_POSITION_PIN = 4;
@@ -32,30 +34,34 @@ const int CVT_POSITION_MIN = 980; // reading when fully retracted
 const int CVT_POSITION_MAX = 280; // reading when fully extended
 const int CVT_AMP_LIMIT = 30000; // mA
 const int CVT_SPEED_MIN = 30;
-const int SAMPLES = 3;
-const int INTERVAL = 50;
+const int INTERVAL = 100;
+const int SAMPLES = 1000 / INTERVAL;
 unsigned int _PID = 0x0002;
 const float P_COEF = -3.0;
 const float I_COEF = -3.0;
 const float D_COEF = 0.0;
 
 // Variables
+volatile int engine_counter = 0;
 volatile int engine_a = 0;
 volatile int engine_b = 0;
+volatile int shaft_counter = 0;
 volatile int shaft_a = 0;
 volatile int shaft_b = 0;
 int time_a = millis();
 int time_b = millis();
-int freq_engine; 
-int freq_shaft; 
+int freq_engine = 0; 
+int freq_shaft = 0; 
 int freq_wheel = 0;
 int cvt_pos = 0;
 int cvt_pos_last = 0;
 int cvt_target = 0;
 int trans_gear = 0;
 int trans_locked = 0;
-int chksum; 
+int chksum = 0; 
 boolean canbus_ok = false;
+RunningMedian engine_rpm = RunningMedian(SAMPLES);
+RunningMedian shaft_rpm = RunningMedian(SAMPLES);
 RunningMedian error = RunningMedian(SAMPLES);
 
 // Motor Controller
@@ -88,10 +94,26 @@ void setup() {
 void loop() {
 
   // Read Sensors
+  engine_counter = 0;
+  shaft_counter = 0;
   delay(INTERVAL);
-  freq_engine = int(60000 / ( ENGINE_BLIPS * (engine_b - engine_a)));
-  freq_shaft = int(60000 / (SHAFT_BLIPS * (shaft_b - shaft_a)));
+  if (USE_TIMER) {
+    freq_engine = int(60000 / ( ENGINE_BLIPS * (engine_b - engine_a)));
+    freq_shaft = int(60000 / (SHAFT_BLIPS * (shaft_b - shaft_a)));
+  }
+  else if (USE_COUNTER) {
+    freq_engine = int(60000 * engine_counter / ( ENGINE_BLIPS * INTERVAL));
+    freq_shaft = int(60000 * shaft_counter / (SHAFT_BLIPS * INTERVAL));
+  }
+  else {
+    freq_engine = 0;
+    freq_shaft = 0;
+  }
   freq_wheel = 0;
+  engine_rpm.add(freq_engine);
+  shaft_rpm.add(freq_shaft);
+  freq_engine = engine_rpm.getAverage();
+  freq_shaft = shaft_rpm.getAverage();
   cvt_pos_last = cvt_pos;
   cvt_pos = map(analogRead(CVT_POSITION_PIN), CVT_POSITION_MIN, CVT_POSITION_MAX, 0, 255);
   trans_gear = analogRead(GEAR_POSITION_PIN);
@@ -157,13 +179,23 @@ void loop() {
 
 // Functions
 void increment_engine(void) {
-  engine_a = engine_b;
-  engine_b = millis();
+  if (USE_COUNTER) {
+    engine_counter++;
+  }
+  else if (USE_TIMER) {
+    engine_a = engine_b;
+    engine_b = millis();
+  }
 }
 
 void increment_shaft(void) {
-  shaft_a = shaft_b;
-  shaft_b = millis();
+  if (USE_COUNTER) {
+    shaft_counter++;
+  }
+  else if (USE_TIMER) {
+    shaft_a = shaft_b;
+    shaft_b = millis();
+  }
 }
 
 int checksum(char* buf) {
