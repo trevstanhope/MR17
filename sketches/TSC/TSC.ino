@@ -37,8 +37,8 @@ const int CVT_SPEED_MIN = 30;
 const int INTERVAL = 100;
 const int SAMPLES = 1000 / INTERVAL;
 unsigned int _PID = 0x0002;
-const float P_COEF = -5.0;
-const float I_COEF = -2.0;
+const float P_COEF = 5.0;
+const float I_COEF = 2.0;
 const float D_COEF = 0.0;
 
 // Variables
@@ -119,11 +119,12 @@ void loop() {
   trans_gear = analogRead(GEAR_POSITION_PIN);
   
   // Run Motor
-  error.add(cvt_pos - cvt_target);
+  int cvt_error = cvt_target - cvt_pos;
+  error.add(cvt_error);
   if (!motors.getM1Fault() && motors.getM1CurrentMilliamps() < CVT_AMP_LIMIT) {
-    int P = P_COEF * (cvt_pos - cvt_target);
+    int P = P_COEF * cvt_error;
     int I = I_COEF * error.getAverage();
-    int D = D_COEF * ((cvt_pos - cvt_pos_last) - cvt_target);
+    int D = D_COEF * (cvt_error + cvt_pos_last);
     int speed = P + I + D;
     if (abs(speed) < CVT_SPEED_MIN) {
       motors.setM1Speed(0);

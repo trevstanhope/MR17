@@ -27,14 +27,16 @@ unsigned char TSC_ID = 11;
 unsigned char VDC_ID = 12;
 
 // Unique Constants
-const int WHEEL_PIN = A2;
-const int STEER_PIN = A3;
-const int SUSP_PIN = A4;
-const int STEERING_SAMPLES = 5;
-const float STEERING_P_GAIN = 1;
+const int WHEEL_PIN = A2; // operator wheel
+const int STEER_PIN = A4; // steering actuator
+const int SUSP_PIN = A5; // suspension ride height
+const int STEERING_SAMPLES = 7;
+const float STEERING_P_GAIN = 3.0;
 const float STEERING_I_GAIN = 0.0;
-const float STEERING_D_GAIN = 0.1;
+const float STEERING_D_GAIN = 0.0;
 unsigned int _PID = 0x0003;
+const int STEERING_MIN = 800;
+const int STEERING_MAX = 1024;
 
 // Variables
 RunningMedian steering_error = RunningMedian(STEERING_SAMPLES);
@@ -61,7 +63,7 @@ void setup() {
   pinMode(WHEEL_PIN, INPUT);
   pinMode(STEER_PIN, INPUT);
   pinMode(SUSP_PIN, INPUT);
-  //motors.init();
+  motors.init();
 }
 
 // Loop
@@ -69,13 +71,13 @@ void loop() {
 
   // Steering
   int wheel = analogRead(WHEEL_PIN);
-  int steer = analogRead(STEER_PIN);
-  steering_error.add(steer-wheel);
-  int P = STEERING_P_GAIN * steer-wheel;
+  int steer = map(analogRead(STEER_PIN), STEERING_MIN, STEERING_MAX, 0, 1024);
+  steering_error.add(steer - wheel);
+  int P = STEERING_P_GAIN * (steer - wheel);
   int I = STEERING_I_GAIN * steering_error.getAverage();
   int D = STEERING_D_GAIN * (steering_error.getHighest() - steering_error.getLowest());
-  int steering_output = P+I+D;
-  //motors.setM1Speed(steering_output);
+  int steering_output = P + I + D;
+  motors.setM1Speed(steering_output);
 
   // Ballast
   int susp = analogRead(SUSP_PIN);
