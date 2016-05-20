@@ -38,8 +38,8 @@ const int INTERVAL = 100;
 const int SAMPLES = 1000 / INTERVAL;
 unsigned int _PID = 0x0002;
 const float P_COEF = 5.0;
-const float I_COEF = 2.0;
-const float D_COEF = 0.0;
+const float I_COEF = 2.5;
+const float D_COEF = 1.0;
 
 // Variables
 volatile int engine_counter = 0;
