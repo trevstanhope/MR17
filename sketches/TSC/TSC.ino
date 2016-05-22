@@ -59,7 +59,7 @@ int cvt_target = 0;
 int trans_gear = 0;
 int trans_locked = 0;
 int chksum = 0; 
-boolean canbus_ok = false;
+int canbus_status = 0;
 RunningMedian engine_rpm = RunningMedian(SAMPLES);
 RunningMedian shaft_rpm = RunningMedian(SAMPLES);
 RunningMedian error = RunningMedian(SAMPLES);
@@ -82,10 +82,23 @@ unsigned char canbus_rx_buffer[CANBUS_LENGTH];
 
 // Setup
 void setup() {
+
+  // Start USB
   Serial.begin(BAUD);
   delay(10);
-  canbus_ok = Canbus.init(CANSPEED_500);
-  delay(10);
+
+  // Start CAN
+  int canbus_attempts = 0;
+  while (!canbus_status) {
+    canbus_status = Canbus.init(CANSPEED_500);
+    delay(10);
+    canbus_attempts++;
+    if (canbus_attempts > 10) {
+      break;
+    }
+  }
+
+  // Interrupts
   attachInterrupt(digitalPinToInterrupt(ENGINE_RPM_PIN), increment_engine, RISING);
   attachInterrupt(digitalPinToInterrupt(SHAFT_RPM_PIN), increment_shaft, RISING);
 }
@@ -133,12 +146,9 @@ void loop() {
       motors.setM1Speed(speed);
     }
   }
-  else {
-    Serial.println("MOTOR FAULT");
-  }
   
   // CANBus
-  if (canbus_ok) {
+  if (canbus_status) {
     canbus_tx_buffer[0] = TSC_ID;
     canbus_tx_buffer[1] = freq_engine;
     canbus_tx_buffer[2] = freq_shaft;
@@ -148,7 +158,7 @@ void loop() {
     canbus_tx_buffer[6] = trans_gear;
     canbus_tx_buffer[7] = trans_locked;
     Canbus.message_tx(_PID, canbus_tx_buffer);
-    // Canbus.message_rx(_PID, canbus_rx_buffer);
+    Canbus.message_rx(canbus_rx_buffer);
   }
   
   // Serial
@@ -176,6 +186,7 @@ void loop() {
     output["target"] = cvt_target;
     output["gear"] = trans_gear;
     output["locked"] = trans_locked;
+    output["canbus"] = canbus_status;
     output.printTo(data_buffer, sizeof(data_buffer));
     chksum = checksum(data_buffer);
     sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, chksum);

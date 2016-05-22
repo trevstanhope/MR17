@@ -40,6 +40,7 @@ const int STEERING_MAX = 1024;
 
 // Variables
 RunningMedian steering_error = RunningMedian(STEERING_SAMPLES);
+int canbus_status = 0;
 
 // Motor Controller
 DualVNH5019MotorShield motors;
@@ -56,13 +57,28 @@ unsigned char canbus_rx_buffer[CANBUS_LENGTH];
 
 // Setup
 void setup() {
+
+  // USB
   Serial.begin(BAUD);
   delay(10);
-  Canbus.init(CANSPEED_500);
-  delay(10);
+  
+  // CANBUS
+  int canbus_attempts = 0;
+  while (!canbus_status) {
+    canbus_status = Canbus.init(CANSPEED_500);
+    delay(10);
+    canbus_attempts++;
+    if (canbus_attempts > 10) {
+      break;
+    }
+  }
+
+  // Pins
   pinMode(WHEEL_PIN, INPUT);
   pinMode(STEER_PIN, INPUT);
   pinMode(SUSP_PIN, INPUT);
+
+  // Motors
   motors.init();
 }
 
@@ -82,7 +98,7 @@ void loop() {
   // Ballast
   int susp = analogRead(SUSP_PIN);
   int ballast_output = 0;
-  //motors.setM2Speed(ballast_output);
+  motors.setM2Speed(ballast_output);
   
   // CANBus
   canbus_tx_buffer[0] = VDC_ID;
@@ -94,13 +110,14 @@ void loop() {
   canbus_tx_buffer[6] = 0;
   canbus_tx_buffer[7] = 0;
   Canbus.message_tx(_PID, canbus_tx_buffer);
-  // Canbus.message_rx(_PID, canbus_rx_buffer);
+  Canbus.message_rx(canbus_rx_buffer);
   
   // Serial Debugger
   if (Serial) {
     root["wheel"] = wheel;
     root["steer"] = steer;
     root["susp"] = susp;
+    root["canbus"] = canbus_status;
     root.printTo(data_buffer, sizeof(data_buffer));
     int chksum = checksum(data_buffer);
     sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, chksum);

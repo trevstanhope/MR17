@@ -24,7 +24,7 @@ unsigned char VDC_ID = 12;
 
 // Variables
 int chksum;
-int canbus_ok;
+int canbus_status = 0;
 
 // Buffers
 char output_buffer[OUTPUT_LENGTH];
@@ -38,11 +38,20 @@ JsonObject& root = json_buffer.createObject();
 
 // Setup
 void setup() {
+
+  // Initialize USB
   Serial.begin(BAUD);
   delay(10);
-  /* Initialise MCP2515 CAN controller at the specified speed */
-  while (!Canbus.init(CANSPEED_500)) {
+  
+  // Initialise MCP2515 CAN controller at the specified speed
+  int canbus_attempts = 0;
+  while (!canbus_status) {
+    canbus_status = Canbus.init(CANSPEED_500);
     delay(10);
+    canbus_attempts++;
+    if (canbus_attempts > 10) {
+      break;
+    }
   }
 }
 
@@ -52,6 +61,7 @@ void loop() {
   // Check CANBus
   unsigned int _UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
   int _ID = canbus_rx_buffer[0];
+  
   // If we do, check to see if the PID matches this device
   if (_ID == ESC_A_ID) { 
     root["stat"] = canbus_rx_buffer[1]; // 0 is off, 1 is standby, 2 is running, 3 is ignition
@@ -90,7 +100,7 @@ void loop() {
 
   // Send JSON to Serial
   int chksum = checksum(data_buffer);
-  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d}", data_buffer, chksum, _ID);
+  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d,\"canbus\":%d}", data_buffer, chksum, _ID, canbus_status);
   Serial.println(output_buffer);
 }
 
