@@ -1,5 +1,10 @@
 {
     "CHERRYPY_ADDR" : "0.0.0.0", 
     "CHERRYPY_PATH" : "agionic/www/", 
-    "CHERRYPY_PORT" : 8080
+    "CHERRYPY_PORT" : 8080,
+    "MONGO_ADDR" : "127.0.0.1",
+    "MONGO_PORT" : 27019,
+    "MONGO_NAME" : "sessions",
+    "MONGO_KEY_LENGTH" : 15,
+    "POLLING_FREQ" : 0.1
 }

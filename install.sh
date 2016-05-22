@@ -76,7 +76,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install python-serial -y -qq
         apt-get install python-pip -y -qq
         apt-get install python-gps -y -qq # python dependencies
-	apt-get install python-zmq -y -qq
+        apt-get install python-zmq -y -qq
         apt-get install mongodb -y -qq # MongoDB
         apt-get install gpsd -y -qq
         apt-get install gpsd-clients -y -qq
@@ -120,9 +120,9 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install libblas-dev -y -qq
         apt-get install liblapack-dev -y -qq
         apt-get install cython -y -qq
-	apt-get install libzmq3 -y -qq
-	apt-get install hostapd -y -qq
-	apt-get install dnsmasq -y -qq
+        apt-get install libzmq3 -y -qq
+        apt-get install hostapd -y -qq
+        apt-get install dnsmasq -y -qq
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
