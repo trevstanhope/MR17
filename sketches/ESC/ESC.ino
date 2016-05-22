@@ -8,7 +8,7 @@
 
 /* --- LIBRARIES --- */
 
-#include "DualVNH5019MotorShield.h"
+#include "DualMC33926MotorShield.h"
 #include "DallasTemperature.h"
 #include "OneWire.h"
 #include <RunningMedian.h>
@@ -16,34 +16,36 @@
 #include <ArduinoJson.h>
 
 /* --- Global Constants --- */
+const bool PRINT_MAIN_INFO = false;
+const bool PRINT_THROTTLE_INFO = false;
+const bool PRINT_BALLAST_INFO = false;
+const bool PRINT_BRAKE_INFO = true;
+const bool SENSORS_ACTIVE = false;
 /// Digital Pins
-// D14 Reserved for Serial2 RFID
-// D15 Reserved for Serial2 RFID
+// D14 Reserved for Serial3 RFID
+// D15 Reserved for Serial3 RFID
 const int LPH_SENSOR_PIN = 18;  // interrupt (#5) required
 
 // Failsafe Digital Input
-const int BUTTON_KILL_POUT = 28;
-const int HITCH_KILL_POUT = 30;
-const int SEAT_KILL_POUT = 32;
+const int HITCH_KILL_PIN = 22;
+const int HITCH_KILL_POUT = 24;
 const int SEAT_KILL_PIN = 26;
-const int HITCH_KILL_PIN = 24;
-const int BUTTON_KILL_PIN = 22;
+const int SEAT_KILL_POUT = 28;
+const int BUTTON_KILL_PIN = 30;
+const int BUTTON_KILL_POUT = 32;
 
 // Joystick (Digital) 
-const int IGNITION_PIN = 23; // white
-const int TRIGGER_KILL_PIN = 25; // pink
-const int PULL_MODE_PIN = 27; // purple
-// D29 is a Blocked pin
-const int CART_FORWARD_PIN = 31; // brown
-const int CART_BACKWARD_PIN = 33; // light blue
-const int CART_MODE_PIN = 35; // dark blue
-// D37 is a Blocked pin
-const int THROTTLE_HIGH_PIN = 39; // yellow
-const int THROTTLE_LOW_PIN = 41; // green
-const int THROTTLE_UP_PIN = 43; // red
-// D45 is a Blocked pin
-const int THROTTLE_DOWN_PIN = 47; // grey
-const int DISPLAY_MODE_PIN = 49; // tan
+const int CART_BACKWARD_PIN = 23;
+const int THROTTLE_HIGH_PIN = 25; // correct
+const int CART_MODE_PIN = 31;
+const int PULL_MODE_PIN = 29; 
+const int IGNITION_PIN = 35;
+const int DISPLAY_MODE_PIN = 33; 
+const int TRIGGER_KILL_PIN = 27; 
+const int THROTTLE_UP_PIN = 39; 
+const int THROTTLE_DOWN_PIN = 41; // correct
+const int CART_FORWARD_PIN = 43; // correct
+const int THROTTLE_LOW_PIN = 47; // correct
 
 // Relay Pins 
 const int STOP_RELAY_PIN = 38;
@@ -60,11 +62,9 @@ const int TEMP_SENSOR_PIN = 46; // TODO: find actual pin number
 const int THROTTLE_POS_PIN = A8;
 const int THROTTLE_POS_MIN_PIN = A9;
 const int THROTTLE_POS_MAX_PIN = A10;
-const int PSI_SENSOR_PIN = A11;
-const int CVT_GUARD_POUT = A12;
-const int CVT_GUARD_PIN = A13;
-const int LEFT_BRAKE_PIN = A2;
-const int RIGHT_BRAKE_PIN = A3;
+const int LEFT_BRAKE_PIN = A11;
+const int RIGHT_BRAKE_PIN = A12;
+const int PSI_SENSOR_PIN = A13;
 
 /* --- Global Settings --- */ 
 /// CMQ
@@ -129,17 +129,18 @@ int left_brake = 0;
 int right_brake = 0;
 int rfid_auth = 0;
 int display_mode = 0; // the desired display mode on the HUD
-int CART_FORWARD = 0;
-int CART_BACKWARD = 0;
-int CART_MODE = 0;
-int THROTTLE_HIGH = 0;
-int THROTTLE_LOW = 0;
-int THROTTLE_UP = 0;
-int THROTTLE_DOWN = 0;
-int THROTTLE = THROTTLE_MIN;
+int cart_forward = 0;
+int cart_backward = 0;
+int cart_mode = 0;
+int throttle_high = 0;
+int throttle_low = 0;
+int throttle_up = 0;
+int throttle_down = 0;
+int throttle_sp = THROTTLE_MAX; // initialize to the minima
+int throttle_pv = THROTTLE_MIN; // initialize to the minima
 float lph = 0;
 float psi = 0;
-float TEMP = 0;
+float temperature = 0;
 
 // Volatile values (Asynchronous variables)
 volatile int LPH_COUNTER = 0;
@@ -153,15 +154,9 @@ char temp_buffer[DIGITS + PRECISION];
 char lph_buffer[DIGITS + PRECISION];
 char psi_buffer[DIGITS + PRECISION];
 
-/// Throttle PID values
-int THROTTLE_SET;
-int THROTTLE_IN;
-int THROTTLE_OUT;
-
 /* --- Global Objects --- */
-
 /// Dual Motor Controller (M1 vs. M2)
-DualVNH5019MotorShield motors;
+DualMC33926MotorShield motors;
 
 /// Temperature probe
 OneWire oneWire(TEMP_SENSOR_PIN);
@@ -214,7 +209,7 @@ void setup() {
   pinMode(THROTTLE_UP_PIN, INPUT);
   pinMode(THROTTLE_DOWN_PIN, INPUT);
   pinMode(DISPLAY_MODE_PIN, INPUT);
-  
+
   // Throttle
   pinMode(THROTTLE_POS_PIN, INPUT);
   pinMode(THROTTLE_POS_MIN_PIN, OUTPUT);
@@ -223,14 +218,10 @@ void setup() {
   digitalWrite(THROTTLE_POS_MAX_PIN, HIGH);
   
   // Brakes
-  pinMode(RIGHT_BRAKE_PIN, INPUT); digitalWrite(RIGHT_BRAKE_PIN, LOW);
-  pinMode(LEFT_BRAKE_PIN, INPUT); digitalWrite(LEFT_BRAKE_PIN, LOW);
-  
-  // CVT Guard
-  pinMode(CVT_GUARD_POUT, OUTPUT);
-  digitalWrite(CVT_GUARD_POUT, LOW);
-  pinMode(CVT_GUARD_PIN, INPUT);
-  digitalWrite(CVT_GUARD_PIN, HIGH);
+  pinMode(RIGHT_BRAKE_PIN, INPUT);
+  digitalWrite(RIGHT_BRAKE_PIN, LOW);
+  pinMode(LEFT_BRAKE_PIN, INPUT);
+  digitalWrite(LEFT_BRAKE_PIN, LOW);
 
   // DualVNH5019 Motor Controller
   motors.init(); 
@@ -262,65 +253,59 @@ void loop() {
   trigger_kill  = check_switch(TRIGGER_KILL_PIN);
   ignition = check_switch(IGNITION_PIN);
   display_mode = check_switch(DISPLAY_MODE_PIN);
-  CART_FORWARD = check_switch(CART_FORWARD_PIN);
-  CART_BACKWARD = check_switch(CART_BACKWARD_PIN);
-  THROTTLE_UP = check_switch(THROTTLE_UP_PIN);
-  THROTTLE_DOWN = check_switch(THROTTLE_DOWN_PIN);
-  THROTTLE_HIGH = check_switch(THROTTLE_HIGH_PIN);
-  THROTTLE_LOW = check_switch(THROTTLE_LOW_PIN);
+  cart_forward = check_switch(CART_FORWARD_PIN);
+  cart_backward = check_switch(CART_BACKWARD_PIN);
+  throttle_up = check_switch(THROTTLE_UP_PIN);
+  throttle_down = check_switch(THROTTLE_DOWN_PIN);
+  throttle_high = check_switch(THROTTLE_HIGH_PIN);
+  throttle_low = check_switch(THROTTLE_LOW_PIN);
   
   // Change VDC and TCS modes
   if (check_switch(CART_MODE_PIN)) {
-    if (CART_MODE == 1) { CART_MODE = 0; }
-    else { CART_MODE = 1; }
+    if (cart_mode == 1) { cart_mode = 0; }
+    else { cart_mode = 1; }
   }
   if (check_switch(PULL_MODE_PIN)) {
-     if (pull_mode == 1) { pull_mode = 0; }
+    if (pull_mode == 1) { pull_mode = 0; }
     else { pull_mode = 1; }
   }
   
   // Check non-switches
-  cvt_guard = check_guard();
   if (rfid_auth == 0) {
     rfid_auth = check_rfid();
   }
   left_brake = check_brake(LEFT_BRAKE_PIN);
   right_brake = check_brake(RIGHT_BRAKE_PIN);
   
-  // Check engine condition
-  TEMP = get_engine_temp();
-  lph = get_fuel_lph();
-  psi = get_oil_psi();
-  
   // Set brakes ALWAYS
   set_brakes(right_brake, left_brake);
   
   //  // Adjust throttle limit, either HIGH/LOW, or increment
-  if (THROTTLE_HIGH  && !THROTTLE_LOW) {
-    THROTTLE = THROTTLE_MAX;
+  if (throttle_high  && !throttle_low) {
+    throttle_sp = THROTTLE_MAX;
   }
-  else if (THROTTLE_LOW && !THROTTLE_HIGH) {
-    THROTTLE = THROTTLE_MIN;
+  else if (throttle_low && !throttle_high) {
+    throttle_sp = THROTTLE_MIN;
   }
-  else if (THROTTLE_UP && !THROTTLE_DOWN) {
-    THROTTLE = THROTTLE + THROTTLE_STEP;
+  else if (throttle_up && !throttle_down) {
+    throttle_sp = THROTTLE + THROTTLE_STEP;
   }
-  else if (THROTTLE_DOWN && !THROTTLE_UP) {
-    THROTTLE = THROTTLE - THROTTLE_STEP;
+  else if (throttle_down && !throttle_up) {
+    throttle_sp = THROTTLE - THROTTLE_STEP;
   }
   else {
-    if (THROTTLE > THROTTLE_MAX) {
-      THROTTLE = THROTTLE_MAX;
+    if (throttle_sp > THROTTLE_MAX) {
+      throttle_sp = THROTTLE_MAX;
     }
-    else if (THROTTLE < THROTTLE_MIN) {
-      THROTTLE = THROTTLE_MIN;
+    else if (throttle_sp < THROTTLE_MIN) {
+      throttle_sp = THROTTLE_MIN;
     }
   }
   if (trigger_kill ) {
-    set_throttle(THROTTLE);
+    throttle_pv = set_throttle(throttle_sp);
   }
   else {
-    set_throttle(0); // DISABLE THROTTLE IF OPERATOR RELEASES TRIGGER
+    throttle_pv = set_throttle(0); // DISABLE THROTTLE IF OPERATOR RELEASES TRIGGER
   }
     
   // (0) If OFF
@@ -334,7 +319,7 @@ void loop() {
     if ( seat_kill || hitch_kill || button_kill ) {
       kill(); // kill engine
     }
-    else if (ignition && left_brake && right_brake && !cvt_guard) {
+    else if (ignition && left_brake && right_brake) {
       start(); // execute ignition sequence
     }
     else {
@@ -359,53 +344,82 @@ void loop() {
     kill();
   }
 
-  // Format float to string
-  dtostrf(lph, DIGITS, PRECISION, lph_buffer);
-  dtostrf(TEMP, DIGITS, PRECISION, temp_buffer);
-  dtostrf(psi, DIGITS, PRECISION, psi_buffer);
+  if (SENSORS_ACTIVE) {
+    
+    // Check engine condition
+    temperature = get_engine_temp();
+    lph = get_fuel_lph();
+    psi = get_oil_psi();
+    
+    // Format float to string
+    dtostrf(lph, DIGITS, PRECISION, lph_buffer);
+    dtostrf(temperature, DIGITS, PRECISION, temp_buffer);
+    dtostrf(psi, DIGITS, PRECISION, psi_buffer);
+  }  
+  // Main Info
+  if (PRINT_MAIN_INFO) {
+    sprintf(data_buffer, "{'run_mode':%d,'disp_mode':%d,'pull_mode':%d,'cart_mode':%d,'rfid_auth':%d,'seat_kill':%d,'hitch_kill':%d}", run_mode, display_mode, pull_mode, cart_mode, rfid_auth, seat_kill, hitch_kill);
+    sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
+    Serial.println(output_buffer);
+    Serial.flush();
+  }
+
+  // Throttle Info
+  if (PRINT_THROTTLE_INFO) {
+    sprintf(data_buffer, "{'ignition':%d,'throttle_sp':%d,'throttle_pv':%d,'trigger':%d,'throttle_low':%d,'throttle_high':%d,'throttle_down':%d,'throttle_up':%d}", ignition, throttle_sp, throttle_pv, trigger_kill, throttle_low, throttle_high, throttle_down, throttle_up);
+    sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
+    Serial.println(output_buffer);
+    Serial.flush();
+  }
+
+  // Ballast Info
+  if (PRINT_BALLAST_INFO) {
+    sprintf(data_buffer, "{'cart_forward':%d,'cart_backward':%d}", cart_forward, cart_backward);
+    sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
+    Serial.println(output_buffer);
+    Serial.flush();
+  }
   
-  // Output to USB Serial
-  sprintf(data_buffer, "{'run_mode':%d,'display_mode':%d,'right_brake':%d,'left_brake':%d,'cvt_guard':%d,'button':%d,'seat':%d,'hitch':%d,'ignition':%d,'rfid':%d,'cart_mode':%d,'cart_fwd':%d,'cart_bwd':%d,'throttle':%d,'trigger':%d,'pull_mode':%d}", run_mode, display_mode, right_brake, left_brake, cvt_guard, button_kill, seat_kill, hitch_kill, ignition, rfid_auth, CART_MODE, CART_FORWARD, CART_BACKWARD, THROTTLE, trigger_kill, pull_mode);
-  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
-  Serial.println(output_buffer);
-  Serial.flush();
+  // Brake Info
+  if (PRINT_BRAKE_INFO) {
+    sprintf(data_buffer, "{'right_brake':%d,'left_brake':%d}", right_brake, left_brake);
+    sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
+    Serial.println(output_buffer);
+    Serial.flush();
+  }
 }
 
 /* --- SYNCHRONOUS TASKS --- */
 /// Set Throttle
-int set_throttle(int val) {
-  THROTTLE_SET = val;
-  int throttle_pos = analogRead(THROTTLE_POS_PIN);
+int set_throttle(int throttle_sp) {
+  int throttle_pv = analogRead(THROTTLE_POS_PIN); // the current throttle position, i.e. the process value (PV)
   
   // Auto-calibrate
-  if (throttle_pos > THROTTLE_POS_MAX) {THROTTLE_POS_MAX = throttle_pos;}
-  if (throttle_pos < THROTTLE_POS_MIN) {THROTTLE_POS_MIN = throttle_pos;}
+  if (throttle_pv > THROTTLE_POS_MAX) {THROTTLE_POS_MAX = throttle_pv;}
+  if (throttle_pv < THROTTLE_POS_MIN) {THROTTLE_POS_MIN = throttle_pv;}
   
-  THROTTLE_IN = map(throttle_pos, THROTTLE_POS_MIN, THROTTLE_POS_MAX, 900, 0); // get the position feedback from the linear actuator
-  int error = THROTTLE_IN - THROTTLE_SET;
-  THROTTLE_OUT = -1 * THROTTLE_P * error;
-  if (THROTTLE_OUT > 400) { THROTTLE_OUT = 400; }
-  if (THROTTLE_OUT < -400) { THROTTLE_OUT = -400; }
+  int throttle_in = map(throttle_pv, THROTTLE_POS_MIN, THROTTLE_POS_MAX, 900, 0); // get the position feedback from the linear actuator
+  int error = throttle_in - throttle_sp;
+  int throttle_out = -1 * THROTTLE_P * error;
+  if (throttle_out > 400) { throttle_out = 400; }
+  if (throttle_out < -400) { throttle_out = -400; }
   
   // Engage throttle actuator
-  if (motors.getM1CurrentMilliamps() >  THROTTLE_MILLIAMP_THRESHOLD) {
-    motors.setM1Speed(0); // disable if over-amp
+  if (motors.getM2CurrentMilliamps() >  THROTTLE_MILLIAMP_THRESHOLD) {
+    motors.setM2Speed(0); // disable if over-amp
   }
   else {
-    motors.setM1Speed(THROTTLE_OUT);
+    motors.setM2Speed(throttle_out);
   }
+
+  return throttle_pv;
 }
 
 /// Check Brake
 // Engage the brakes linearly
 int check_brake(int pin) {
-  int val = analogRead(pin); // read left brake signal
-  if (val > BRAKES_THRESHOLD) {
-    return 400;
-  }
-  else {
-    return 0;
-  }
+  int val = analogRead(pin); // read brake signal
+  return val;
 }
 
 /// Set brakes
@@ -416,8 +430,8 @@ int set_brakes(int left_brake, int right_brake) {
   int output = (left_brake + right_brake) / 2;
 
   // Engage brakes
-  brakes_milliamp = motors.getM2CurrentMilliamps();
-  motors.setM2Speed(output);
+  brakes_milliamp = motors.getM1CurrentMilliamps();
+  motors.setM1Speed(output);
 }
 
 /// Check Switch
@@ -476,17 +490,6 @@ int checksum(char* buf) {
   return val;
 }
 
-/// Check Guard
-// Returns true if guard is open
-int check_guard(void) {
-  int val = analogRead(CVT_GUARD_PIN);
-  if (val <= CVT_GUARD_THRESHOLD) {
-      return 1;
-    }
-    else {
-      return 0;
-    }
-}
 
 /// Check Seat
 // Returns 1 if seat is empty, checks for SEAT_LIMIT iterations before activating
