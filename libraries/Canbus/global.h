@@ -3,14 +3,11 @@
 
 // ----------------------------------------------------------------------------
 
-#define	true	1
-#define	false	0
+#define true	1
+#define false	0
 
-#define	True	1
-#define	False	0
-
-//typedef	_Bool bool;
-//typedef	boolean Bool;
+#define True	1
+#define False	0
 
 // ----------------------------------------------------------------------------
 
