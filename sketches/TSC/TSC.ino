@@ -90,7 +90,7 @@ void setup() {
 
   // Interrupts
   attachInterrupt(digitalPinToInterrupt(ENGINE_RPM_PIN), increment_engine, RISING);
-  attachInterrupt(digitalPinToInterrupt(SHAFT_RPM_PIN), increment_shaft, RISING);
+  attachInterrupt(digitalPinToInterrupt(SHAFT_RPM_PIN), increment_driveshaft, RISING);
 }
 
 /* --- Loop --- */
@@ -152,7 +152,7 @@ void loop() {
     int ID = canbus_rx_buffer[0];
   }
   
-  // Serial
+  // Push info over Serial
   if(Serial) {
     if (Serial.available() > 0) {
       int i = 0;
@@ -186,6 +186,7 @@ void loop() {
 }
 
 /* --- Functions --- */
+// Driveshaft counter function
 void increment_engine(void) {
   if (USE_COUNTER) {
     engine_counter++;
@@ -196,7 +197,8 @@ void increment_engine(void) {
   }
 }
 
-void increment_shaft(void) {
+// Driveshaft Counter function
+void increment_driveshaft(void) {
   if (USE_COUNTER) {
     shaft_counter++;
   }
@@ -206,6 +208,7 @@ void increment_shaft(void) {
   }
 }
 
+// Checksum function
 int checksum(char* buf) {
   int sum = 0;
   for (int i = 0; i < DATA_LENGTH; i++) {

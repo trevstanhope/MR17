@@ -9,24 +9,14 @@
   * M2 is Ballast
 */
 
-// Libraries
+/* --- Libraries --- */
 #include <Canbus.h>
 #include <DualVNH5019MotorShield.h>
 #include <RunningMedian.h>
 #include <ArduinoJson.h>
+#include "MR17_CAN.h"
 
-// Common Constants
-const int BAUD = 9600;
-const int OUTPUT_LENGTH = 256;
-const int DATA_LENGTH = 256;
-const int JSON_LENGTH = 512;
-const int INPUT_LENGTH = 256;
-const int CANBUS_LENGTH = 8;
-unsigned char ESC_ID = 10;
-unsigned char TSC_ID = 11;
-unsigned char VDC_ID = 12;
-
-// Unique Constants
+/* --- Global Constants --- */
 const int WHEEL_PIN = A2; // operator wheel
 const int STEER_PIN = A4; // steering actuator
 const int SUSP_PIN = A5; // suspension ride height
@@ -34,11 +24,11 @@ const int STEERING_SAMPLES = 7;
 const float STEERING_P_GAIN = 3.0;
 const float STEERING_I_GAIN = 0.0;
 const float STEERING_D_GAIN = 0.0;
-unsigned int _PID = 0x0003;
 const int STEERING_MIN = 800;
 const int STEERING_MAX = 1024;
 
-// Variables
+/* --- Global Variables --- */
+// 
 RunningMedian steering_error = RunningMedian(STEERING_SAMPLES);
 int canbus_status = 0;
 
@@ -109,7 +99,7 @@ void loop() {
   canbus_tx_buffer[5] = map(ballast_output, -400, 400, 0, 255); // M2 output
   canbus_tx_buffer[6] = 0;
   canbus_tx_buffer[7] = 0;
-  Canbus.message_tx(_PID, canbus_tx_buffer);
+  Canbus.message_tx(VDC_PID, canbus_tx_buffer);
   Canbus.message_rx(canbus_rx_buffer);
   
   // Serial Debugger

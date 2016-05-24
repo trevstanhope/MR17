@@ -26,7 +26,7 @@ unsigned char canbus_tx_buffer[CANBUS_LENGTH];  // Buffer to store the incoming 
 StaticJsonBuffer<JSON_LENGTH> json_buffer;
 JsonObject& root = json_buffer.createObject();
 
-// Setup
+/* --- Setup --- */
 void setup() {
 
   // Initialize USB
@@ -45,7 +45,7 @@ void setup() {
   }
 }
 
-// Loop
+/* --- Loop --- */
 void loop() {
   
   // Check CANBus
@@ -92,6 +92,7 @@ void loop() {
   Serial.println(output_buffer);
 }
 
+/* --- Functions --- */
 // Checksum
 int checksum(char* buf) {
   int sum = 0;
@@ -101,10 +102,12 @@ int checksum(char* buf) {
   return sum % 256;
 }
 
+// Float to Char
 float float_to_char(float val) {
   return 0.0;
 }
 
+// Map function adapted to floating points numbers
 float mapfloat(long x, long in_min, long in_max, long out_min, long out_max) {
  return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
 }
