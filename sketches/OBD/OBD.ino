@@ -3,25 +3,15 @@
   On-Board Diagnostics
 */
 
-// Libraries
+/* --- Libraries --- */
 #include <Canbus.h>
 #include <ArduinoJson.h>
 #include <RunningMedian.h>
+#include "MR17_CAN.h"
 
-// Common Constants
-const int BAUD = 9600;
-const int OUTPUT_LENGTH = 256;
-const int DATA_LENGTH = 256;
-const int JSON_LENGTH = 512;
-const int INPUT_LENGTH = 256;
-const int CANBUS_LENGTH = 8;
-unsigned char ESC_A_ID = 9;
-unsigned char ESC_B_ID = 10;
-unsigned char TSC_ID = 11;
-unsigned char VDC_ID = 12;
+/* --- Global Constants --- */
 
-// Unique Constants
-
+/* --- Global Variables --- */
 // Variables
 int chksum;
 int canbus_status = 0;
@@ -59,11 +49,11 @@ void setup() {
 void loop() {
   
   // Check CANBus
-  unsigned int _UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
-  int _ID = canbus_rx_buffer[0];
+  unsigned int UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
+  int ID = canbus_rx_buffer[0];
   
-  // If we do, check to see if the PID matches this device
-  if (_ID == ESC_A_ID) { 
+  // Check to see if the ID matches a known device on CAN
+  if (ID == ESC_A_ID) { 
     root["stat"] = canbus_rx_buffer[1]; // 0 is off, 1 is standby, 2 is running, 3 is ignition
     root["thro"] = map(canbus_rx_buffer[2], 0, 255, 0, 100);
     root["kill"] = canbus_rx_buffer[3]; // 0 is none, 1 is seat, 2 is hitch
@@ -71,7 +61,7 @@ void loop() {
     root["lbpw"] = map(canbus_rx_buffer[5], 0, 255, 0, 100); // 0 to 256 bits is 0 to 100 %
     root["rbpw"] = map(canbus_rx_buffer[6], 0, 255, 0, 100); // 0 to 256 bits is 0 to 100 %
   }
-  if (_ID == ESC_B_ID) { 
+  if (ID == ESC_B_ID) { 
     root["user"] = canbus_rx_buffer[1]; // 0 to 256 bits is 0 to 25 V
     root["temp"] = canbus_rx_buffer[2];
     root["oilp"] = canbus_rx_buffer[3];
@@ -80,14 +70,14 @@ void loop() {
     root["rbse"] = canbus_rx_buffer[6]; // 0 to 100 %
     root["batt"] = mapfloat(canbus_rx_buffer[7], 0, 255, 0, 25); // 0 to 25 V
   }
-  else if (_ID == VDC_ID) {
-    root["whel"] = map(canbus_rx_buffer[1], 0, 255, -100, 100); // -100 to 100 %
-    root["ster"] = map(canbus_rx_buffer[2], 0, 255, -100, 100); // -100 to 100 %
+  else if (ID == VDC_ID) {
+    root["wheel"] = map(canbus_rx_buffer[1], 0, 255, -100, 100); // -100 to 100 %
+    root["steer"] = map(canbus_rx_buffer[2], 0, 255, -100, 100); // -100 to 100 %
     root["mot1"] = mapfloat(canbus_rx_buffer[3], 0, 255, -100, 100) + 1; // -100 to 100 %
     root["susp"] = mapfloat(canbus_rx_buffer[4], 0, 255, 0, 100); // 0 to 100 %
     root["mot2"] = mapfloat(canbus_rx_buffer[5], 0, 255, -100, 100) + 1; // 0 to 100 %
   }
-  else if (_ID == TSC_ID) {
+  else if (ID == TSC_ID) {
     root["gear"] = canbus_rx_buffer[1]; // 0,1,2,3,4 is neutral, 1st, 2nd, 3rd and reverse, respectively
     root["slip"] = map(canbus_rx_buffer[2], 0, 255, 0, 100); // 0 to 100 %
     root["temp"] = map(canbus_rx_buffer[3], 0, 255, -100, 100); //-100 to 100 degrees Celcius
@@ -97,10 +87,8 @@ void loop() {
     root["lock"] = canbus_rx_buffer[7]; // 0 is unlocked, 1 is locked
   }
   root.printTo(data_buffer, sizeof(data_buffer));
-
-  // Send JSON to Serial
   int chksum = checksum(data_buffer);
-  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d,\"canbus\":%d}", data_buffer, chksum, _ID, canbus_status);
+  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d,\"canbus\":%d}", data_buffer, chksum, ID, canbus_status);
   Serial.println(output_buffer);
 }
 

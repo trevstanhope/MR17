@@ -3,29 +3,20 @@
   Transmission System Controller
 */
 
-// Libraries
+/* --- Libraries --- */
 #include <RunningMedian.h>
 #include <Canbus.h>
 #include <ArduinoJson.h>
 #include <DualVNH5019MotorShield.h>
+#include "MR17_CAN.h"
 
-// Common Constants
-const int BAUD = 9600;
-const int OUTPUT_LENGTH = 256;
-const int DATA_LENGTH = 256;
-const int JSON_LENGTH = 512;
-const int INPUT_LENGTH = 256;
-const int CANBUS_LENGTH = 8;
-unsigned char ESC_ID = 10;
-unsigned char TSC_ID = 11;
-unsigned char VDC_ID = 12;
-
-// Unique Constants
-const bool USE_TIMER = false;
-const bool USE_COUNTER = true;
+/* --- Global Constants --- */
+// IO Pins
 const int ENGINE_RPM_PIN = 19;
 const int SHAFT_RPM_PIN = 18;
-// 21 is reserved for CANBUS
+// D21 is reserved for CANBUS
+const bool USE_TIMER = false;
+const bool USE_COUNTER = true;
 const int ENGINE_BLIPS = 16;
 const int SHAFT_BLIPS = 8;
 const int CVT_POSITION_PIN = 3;
@@ -36,12 +27,11 @@ const int CVT_AMP_LIMIT = 30000; // mA
 const int CVT_SPEED_MIN = 30;
 const int INTERVAL = 100;
 const int SAMPLES = 1000 / INTERVAL;
-unsigned int _PID = 0x0002;
 const float P_COEF = 6.0;
 const float I_COEF = 3.5;
 const float D_COEF = -3.5;
 
-// Variables
+/* --- Global Variables --- */
 volatile int engine_counter = 0;
 volatile int engine_a = 0;
 volatile int engine_b = 0;
@@ -80,7 +70,7 @@ char input_buffer[INPUT_LENGTH];
 unsigned char canbus_tx_buffer[CANBUS_LENGTH];
 unsigned char canbus_rx_buffer[CANBUS_LENGTH];
 
-// Setup
+/* --- Setup --- */
 void setup() {
 
   // Start USB
@@ -103,7 +93,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(SHAFT_RPM_PIN), increment_shaft, RISING);
 }
 
-// Loop
+/* --- Loop --- */
 void loop() {
 
   // Read Sensors
@@ -131,7 +121,7 @@ void loop() {
   cvt_pos = map(analogRead(CVT_POSITION_PIN), CVT_POSITION_MIN, CVT_POSITION_MAX, 0, 255);
   trans_gear = analogRead(GEAR_POSITION_PIN);
   
-  // Run Motor
+  // Set CVT Motor
   int cvt_error = cvt_target - cvt_pos;
   error.add(cvt_error);
   if (!motors.getM1Fault() && motors.getM1CurrentMilliamps() < CVT_AMP_LIMIT) {
@@ -157,8 +147,9 @@ void loop() {
     canbus_tx_buffer[5] = cvt_target;
     canbus_tx_buffer[6] = trans_gear;
     canbus_tx_buffer[7] = trans_locked;
-    Canbus.message_tx(_PID, canbus_tx_buffer);
-    Canbus.message_rx(canbus_rx_buffer);
+    Canbus.message_tx(TSC_PID, canbus_tx_buffer);
+    unsigned int UID = Canbus.message_rx(canbus_rx_buffer);
+    int ID = canbus_rx_buffer[0];
   }
   
   // Serial
@@ -194,7 +185,7 @@ void loop() {
   }
 }
 
-// Functions
+/* --- Functions --- */
 void increment_engine(void) {
   if (USE_COUNTER) {
     engine_counter++;
