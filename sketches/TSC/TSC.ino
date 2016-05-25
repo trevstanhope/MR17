@@ -12,19 +12,23 @@
 
 /* --- Global Constants --- */
 // IO Pins
-const int FIRST_GEAR_PIN = 26;
-const int SECOND_GEAR_PIN = 28;
-const int THIRD_GEAR_PIN = 30;
-const int REVERSE_GEAR_PIN = 32;
+const int GEAR_POUT = A13;
+const int REVERSE_GEAR_PIN = 43;
+const int FIRST_GEAR_PIN = 45;
+const int SECOND_GEAR_PIN = 47;
+const int THIRD_GEAR_PIN = 49;
 const int ENGINE_RPM_PIN = 19;
 const int SHAFT_RPM_PIN = 18;
-// D21 is reserved for CANBUS
+const int SHAFT_BLIPS = 8;
+const int CVT_POSITION_PIN = A3;
+const int GUARD_PHOTOSENSOR_PIN = A14;
+const int GUARD_PHOTOSENSOR_POUT = A15;
+// D21 is reserved for CANBUS interrupt
+
+// Miscellaneous
 const bool USE_TIMER = false;
 const bool USE_COUNTER = true;
 const int ENGINE_BLIPS = 16;
-const int SHAFT_BLIPS = 8;
-const int CVT_POSITION_PIN = 3;
-const int GEAR_POSITION_PIN = 4;
 const int CVT_POSITION_MIN = 900; // reading when fully retracted
 const int CVT_POSITION_MAX = 280; // reading when fully extended
 const int CVT_AMP_LIMIT = 30000; // mA
@@ -34,6 +38,7 @@ const int SAMPLES = 1000 / INTERVAL;
 const float P_COEF = 6.0;
 const float I_COEF = 3.5;
 const float D_COEF = -3.5;
+const int GUARD_PHOTOSENSOR_THRESHOLD = 300;
 
 /* --- Global Variables --- */
 volatile int engine_counter = 0;
@@ -52,6 +57,7 @@ int cvt_pos_last = 0;
 int cvt_target = 0;
 int trans_gear = 0;
 int trans_locked = 0;
+int guard_photosensor = 0;
 int chksum = 0; 
 int canbus_status = 0;
 RunningMedian engine_rpm = RunningMedian(SAMPLES);
@@ -98,9 +104,21 @@ void setup() {
 
   // Transaxle Gear Input Pins
   pinMode(FIRST_GEAR_PIN, INPUT);
+  digitalWrite(FIRST_GEAR_PIN, HIGH);
   pinMode(SECOND_GEAR_PIN, INPUT);
+  digitalWrite(SECOND_GEAR_PIN, HIGH);
   pinMode(THIRD_GEAR_PIN, INPUT);
+  digitalWrite(THIRD_GEAR_PIN, HIGH);
   pinMode(REVERSE_GEAR_PIN, INPUT);
+  digitalWrite(REVERSE_GEAR_PIN, HIGH);
+  pinMode(GEAR_POUT, OUTPUT);
+  digitalWrite(GEAR_POUT, LOW);
+
+  // CVT Guard
+  pinMode(GUARD_PHOTOSENSOR_PIN, INPUT);
+  digitalWrite(GUARD_PHOTOSENSOR_PIN, HIGH);
+  pinMode(GUARD_PHOTOSENSOR_POUT, OUTPUT);
+  digitalWrite(GUARD_PHOTOSENSOR_POUT, LOW);
 }
 
 /* --- Loop --- */
@@ -130,6 +148,7 @@ void loop() {
   cvt_pos_last = cvt_pos;
   cvt_pos = map(analogRead(CVT_POSITION_PIN), CVT_POSITION_MIN, CVT_POSITION_MAX, 0, 255);
   trans_gear = get_transaxle_gear();
+  guard_photosensor = get_guard_photolock();
   
   // Set CVT Motor
   int cvt_error = cvt_target - cvt_pos;
@@ -152,7 +171,7 @@ void loop() {
     canbus_tx_buffer[0] = TSC_ID;
     canbus_tx_buffer[1] = freq_engine;
     canbus_tx_buffer[2] = freq_shaft;
-    canbus_tx_buffer[3] = freq_wheel;
+    canbus_tx_buffer[3] = guard_photosensor;
     canbus_tx_buffer[4] = cvt_pos;
     canbus_tx_buffer[5] = cvt_target;
     canbus_tx_buffer[6] = trans_gear;
@@ -187,6 +206,7 @@ void loop() {
     output["target"] = cvt_target;
     output["gear"] = trans_gear;
     output["locked"] = trans_locked;
+    output["guard_sensor"] = guard_photosensor;
     output["canbus"] = canbus_status;
     output.printTo(data_buffer, sizeof(data_buffer));
     chksum = checksum(data_buffer);
@@ -228,21 +248,33 @@ int checksum(char* buf) {
 }
 
 int get_transaxle_gear(void) {
-  if (digitalRead(FIRST_GEAR_PIN)) {
+  if (!digitalRead(FIRST_GEAR_PIN)) {
     return 1;
   }
-  else if (digitalRead(SECOND_GEAR_PIN)) {
+  else if (!digitalRead(SECOND_GEAR_PIN)) {
     return 2;
   }
-  else if (digitalRead(THIRD_GEAR_PIN)) {
+  else if (!digitalRead(THIRD_GEAR_PIN)) {
     return 3;
   }
-  else if (digitalRead(REVERSE_GEAR_PIN)) {
+  else if (!digitalRead(REVERSE_GEAR_PIN)) {
     return 4;
   }
   else {
     return 0; // neutral gear
   }
 
+}
+
+/// Interlock guard photosensor for safety
+// returns 0 if safe, returns 1 if guard is off.
+int get_guard_photolock(void) {
+  int val = analogRead(GUARD_PHOTOSENSOR_PIN);
+  if (val < GUARD_PHOTOSENSOR_THRESHOLD) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
 }
 

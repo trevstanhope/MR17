@@ -83,7 +83,7 @@ void loop() {
   else if (ID == TSC_ID) {
     root["erpm"] = canbus_rx_buffer[1]; // 0,1,2,3,4 is neutral, 1st, 2nd, 3rd and reverse, respectively
     root["drpm"] = map(canbus_rx_buffer[2], 0, 255, 0, 100); // 0 to 100 %
-    root["slot3"] = map(canbus_rx_buffer[3], 0, 255, -100, 100); //-100 to 100 degrees Celcius
+    root["guard"] = canbus_rx_buffer[3]; //-100 to 100 degrees Celcius
     root["cvtp"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
     root["cvtt"] = map(canbus_rx_buffer[5], 0, 255, 0, 100); // 0 to 3600 rpm
     root["gear"] = canbus_rx_buffer[6]; // 0 to 3600 rpm
