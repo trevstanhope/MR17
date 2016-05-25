@@ -17,7 +17,7 @@
 
 /* --- Global Constants --- */
 // Print Flags
-const bool PRINT_MAIN_INFO = true;
+const bool PRINT_MAIN_INFO = false;
 const bool PRINT_THROTTLE_INFO = false;
 const bool PRINT_VDC_INFO = false;
 const bool PRINT_TSC_INFO = false;
@@ -82,25 +82,25 @@ const int RFID_READ = 0x02;
 const int KILL_WAIT = 500;
 const int IGNITION_WAIT = 200;
 const int MOTORS_WAIT = 100;
-const int STANDBY_WAIT = 10;
+const int STANDBY_WAIT = 5;
 const int REBOOT_WAIT = 1000;
 
 /// Brake variables
 const int BRAKES_THRESHOLD = 20;
 const int BRAKES_MILLIAMP_THRESH = 30000;
-const int BRAKES_DEADBAND = 50;
-const int BRAKES_MAX = 512;
+const int BRAKES_DEADBAND = 10;
+const int BRAKES_MIN = 0;
+const int BRAKES_MAX = 1024;
 
 /// Throttle
-const int THROTTLE_POS_MIN = 274;
-const int THROTTLE_POS_MAX = 980;
+const int THROTTLE_POS_MIN = 580;
+const int THROTTLE_POS_MAX = 1024;
 const int THROTTLE_MIN = 0;
-const int THROTTLE_MAX = 1024;
-const int THROTTLE_MILLIAMP_THRESHOLD = 15000;
-const int THROTTLE_P = 10 ;
-const int THROTTLE_I = 1;
-const int THROTTLE_D = 2;
-const int THROTTLE_STEP = 64;
+const int THROTTLE_MAX = 255;
+const int THROTTLE_MILLIAMP_THRESHOLD = 10000;
+const int THROTTLE_GAIN = 50;
+const int THROTTLE_STEP = 32;
+const int THROTTLE_DEADBAND = 8;
 
 /// Joystick
 const int JOYSTICK_MAX = 430;
@@ -285,15 +285,10 @@ void loop() {
   seat_kill = check_seat();
 
   // Check Regular Switches (Default to 0 if disconnected)
-  trigger_kill  = check_switch(TRIGGER_KILL_PIN);
   ignition = check_switch(IGNITION_PIN);
   display_mode = check_switch(DISPLAY_MODE_PIN);
   cart_forward = check_switch(CART_FORWARD_PIN);
   cart_backward = check_switch(CART_BACKWARD_PIN);
-  throttle_up = check_switch(THROTTLE_UP_PIN);
-  throttle_down = check_switch(THROTTLE_DOWN_PIN);
-  throttle_high = check_switch(THROTTLE_HIGH_PIN);
-  throttle_low = check_switch(THROTTLE_LOW_PIN);
 
   // Change VDC and TSC modes
   if (check_switch(CART_MODE_PIN)) {
@@ -326,7 +321,12 @@ void loop() {
   // CVT
   cvt_sp = check_joystick(JOYSTICK_Y_PIN);
 
-  //  // Adjust throttle limit, either HIGH/LOW, or increment
+  // Throttle
+  trigger_kill  = check_switch(TRIGGER_KILL_PIN);
+  throttle_up = check_switch(THROTTLE_UP_PIN);
+  throttle_down = check_switch(THROTTLE_DOWN_PIN);
+  throttle_high = check_switch(THROTTLE_HIGH_PIN);
+  throttle_low = check_switch(THROTTLE_LOW_PIN);
   if (throttle_high  && !throttle_low) {
     throttle_sp = THROTTLE_MAX;
   }
@@ -399,9 +399,9 @@ void loop() {
   temperature = get_engine_temp();
   lph = get_fuel_lph();
   psi = get_oil_psi();
-  dtostrf(lph, DIGITS, PRECISION, lph_buffer);
-  dtostrf(temperature, DIGITS, PRECISION, temp_buffer);
-  dtostrf(psi, DIGITS, PRECISION, psi_buffer);
+  //dtostrf(lph, DIGITS, PRECISION, lph_buffer);
+  //dtostrf(temperature, DIGITS, PRECISION, temp_buffer);
+  //dtostrf(psi, DIGITS, PRECISION, psi_buffer);
 
   // Main Info
   if (Serial) {
@@ -453,13 +453,24 @@ void loop() {
 
     // Send Message A
     canbus_tx_buffer[0] = ESC_A_ID;
-    canbus_tx_buffer[1] = freq_engine;
-    canbus_tx_buffer[2] = freq_shaft;
-    canbus_tx_buffer[3] = freq_wheel;
-    canbus_tx_buffer[4] = cvt_pos;
-    canbus_tx_buffer[5] = cvt_target;
-    canbus_tx_buffer[6] = trans_gear;
-    canbus_tx_buffer[7] = trans_locked;
+    canbus_tx_buffer[1] = run_mode;
+    canbus_tx_buffer[2] = cart_mode;
+    canbus_tx_buffer[3] = pull_mode;
+    canbus_tx_buffer[4] = map(cvt_sp, 0, 1024, 0, 100);
+    canbus_tx_buffer[5] = map(throttle_sp, 0, 1024, 0, 100);
+    canbus_tx_buffer[6] = left_brake;
+    canbus_tx_buffer[7] = right_brake;
+    Canbus.message_tx(ESC_A_PID, canbus_tx_buffer);
+
+    // Send Message B (
+    canbus_tx_buffer[0] = ESC_B_ID;
+    canbus_tx_buffer[1] = lph;
+    canbus_tx_buffer[2] = temperature;
+    canbus_tx_buffer[3] = psi;
+    canbus_tx_buffer[4] = 0;
+    canbus_tx_buffer[5] = 0;
+    canbus_tx_buffer[6] = 0;
+    canbus_tx_buffer[7] = 0;
     Canbus.message_tx(ESC_A_PID, canbus_tx_buffer);
   }
 
@@ -470,23 +481,27 @@ void loop() {
 int set_throttle(int sp) {
 
   // Read position and compute PID
-  int pv = analogRead(THROTTLE_POS_PIN); // the current throttle position, i.e. the process value (PV)
-  int throttle_in = map(pv, THROTTLE_POS_MIN, THROTTLE_POS_MAX, 900, 0); // get the position feedback from the linear actuator
-  int error = throttle_in - sp;
-  int throttle_out = -1 * THROTTLE_P * error;
-  if (throttle_out > 400) {
-    throttle_out = 400;
+  int val = analogRead(THROTTLE_POS_PIN); // the current throttle position, i.e. the process value (PV)
+  int pv = map(val, THROTTLE_POS_MIN, THROTTLE_POS_MAX, 0, 255); // get the position feedback from the linear actuator
+  int error = sp - pv;
+  int pwr;
+  if (pwr > THROTTLE_DEADBAND) {
+    pwr = 400;
   }
-  if (throttle_out < -400) {
-    throttle_out = -400;
+  else if (pwr < -THROTTLE_DEADBAND) {
+    pwr = -400;
+  }
+  else {
+    pwr = THROTTLE_GAIN * error;
   }
 
   // Engage throttle actuator
   if (motors.getM2CurrentMilliamps() >  THROTTLE_MILLIAMP_THRESHOLD) {
     motors.setM2Speed(0); // disable if over-amp
+    Serial.println("AT THRESHOLD");
   }
   else {
-    motors.setM2Speed(throttle_out);
+    motors.setM2Speed(pwr);
   }
 
   return pv;
@@ -506,14 +521,12 @@ int check_joystick(int pin) {
 }
 
 /// Check Brake
-// Engage the brakes linearly
 int check_brake(int pin) {
   int val = analogRead(pin); // read brake signal
-  return val;
+  return map(val, BRAKES_MIN, BRAKES_MAX, 0, 100);
 }
 
 /// Set brakes
-// Returns true if the brake interlock is engaged
 int set_brakes(int right_brake, int left_brake) {
 
   // Map the brake values for DualVNH5019 output
@@ -552,7 +565,7 @@ int check_rfid(void) {
   int b = Serial3.read();
   int c = Serial3.read();
   int d = Serial3.read();
-  if ((a >= 0) || (b >= 0) || (c >= 0) || (d >= 0)) {
+  if ((a >= 0) && (b >= 0) && (c >= 0) && (d >= 0)) {
     return a + b + c + d; // the user's key number
   }
   else {

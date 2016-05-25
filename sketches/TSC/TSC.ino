@@ -12,6 +12,10 @@
 
 /* --- Global Constants --- */
 // IO Pins
+const int FIRST_GEAR_PIN = 26;
+const int SECOND_GEAR_PIN = 28;
+const int THIRD_GEAR_PIN = 30;
+const int REVERSE_GEAR_PIN = 32;
 const int ENGINE_RPM_PIN = 19;
 const int SHAFT_RPM_PIN = 18;
 // D21 is reserved for CANBUS
@@ -24,7 +28,7 @@ const int GEAR_POSITION_PIN = 4;
 const int CVT_POSITION_MIN = 900; // reading when fully retracted
 const int CVT_POSITION_MAX = 280; // reading when fully extended
 const int CVT_AMP_LIMIT = 30000; // mA
-const int CVT_SPEED_MIN = 30;
+const int CVT_DEADBAND = 50;
 const int INTERVAL = 100;
 const int SAMPLES = 1000 / INTERVAL;
 const float P_COEF = 6.0;
@@ -91,6 +95,12 @@ void setup() {
   // Interrupts
   attachInterrupt(digitalPinToInterrupt(ENGINE_RPM_PIN), increment_engine, RISING);
   attachInterrupt(digitalPinToInterrupt(SHAFT_RPM_PIN), increment_driveshaft, RISING);
+
+  // Transaxle Gear Input Pins
+  pinMode(FIRST_GEAR_PIN, INPUT);
+  pinMode(SECOND_GEAR_PIN, INPUT);
+  pinMode(THIRD_GEAR_PIN, INPUT);
+  pinMode(REVERSE_GEAR_PIN, INPUT);
 }
 
 /* --- Loop --- */
@@ -119,7 +129,7 @@ void loop() {
   freq_shaft = shaft_rpm.getAverage();
   cvt_pos_last = cvt_pos;
   cvt_pos = map(analogRead(CVT_POSITION_PIN), CVT_POSITION_MIN, CVT_POSITION_MAX, 0, 255);
-  trans_gear = analogRead(GEAR_POSITION_PIN);
+  trans_gear = get_transaxle_gear();
   
   // Set CVT Motor
   int cvt_error = cvt_target - cvt_pos;
@@ -129,7 +139,7 @@ void loop() {
     float I = I_COEF * error.getAverage();
     float D = D_COEF * (cvt_pos - cvt_pos_last);
     int speed = P + I + D;
-    if (abs(speed) < CVT_SPEED_MIN) {
+    if (abs(speed) < CVT_DEADBAND) {
       motors.setM1Speed(0);
     }
     else {
@@ -217,4 +227,22 @@ int checksum(char* buf) {
   return sum % 256;
 }
 
+int get_transaxle_gear(void) {
+  if (digitalRead(FIRST_GEAR_PIN)) {
+    return 1;
+  }
+  else if (digitalRead(SECOND_GEAR_PIN)) {
+    return 2;
+  }
+  else if (digitalRead(THIRD_GEAR_PIN)) {
+    return 3;
+  }
+  else if (digitalRead(REVERSE_GEAR_PIN)) {
+    return 4;
+  }
+  else {
+    return 0; // neutral gear
+  }
+
+}
 

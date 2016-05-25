@@ -22,10 +22,6 @@ char data_buffer[DATA_LENGTH];
 unsigned char canbus_rx_buffer[CANBUS_LENGTH];  // Buffer to store the incoming data
 unsigned char canbus_tx_buffer[CANBUS_LENGTH];  // Buffer to store the incoming data
 
-// JSON
-StaticJsonBuffer<JSON_LENGTH> json_buffer;
-JsonObject& root = json_buffer.createObject();
-
 /* --- Setup --- */
 void setup() {
 
@@ -51,39 +47,46 @@ void loop() {
   // Check CANBus
   unsigned int UID = Canbus.message_rx(canbus_rx_buffer); // Check to see if we have a message on the Bus
   int ID = canbus_rx_buffer[0];
+
+  // Create empty JSON buffer
+  StaticJsonBuffer<JSON_LENGTH> json_buffer;
+  JsonObject& root = json_buffer.createObject();
   
   // Check to see if the ID matches a known device on CAN
   if (ID == ESC_A_ID) { 
-    root["stat"] = canbus_rx_buffer[1]; // 0 is off, 1 is standby, 2 is running, 3 is ignition
-    root["thro"] = map(canbus_rx_buffer[2], 0, 255, 0, 100);
-    root["kill"] = canbus_rx_buffer[3]; // 0 is none, 1 is seat, 2 is hitch
-    root["int"] = canbus_rx_buffer[4];
-    root["lbpw"] = map(canbus_rx_buffer[5], 0, 255, 0, 100); // 0 to 256 bits is 0 to 100 %
-    root["rbpw"] = map(canbus_rx_buffer[6], 0, 255, 0, 100); // 0 to 256 bits is 0 to 100 %
+    root["run"] = canbus_rx_buffer[1];
+    root["cart"] = canbus_rx_buffer[2];
+    root["pull"] = canbus_rx_buffer[3];
+    root["cvt"] = canbus_rx_buffer[4];
+    root["throttle"] = canbus_rx_buffer[5];
+    root["right_brake"] = canbus_rx_buffer[6]; 
+    root["left_brake"] = canbus_rx_buffer[7];
   }
   if (ID == ESC_B_ID) { 
-    root["user"] = canbus_rx_buffer[1]; // 0 to 256 bits is 0 to 25 V
-    root["temp"] = canbus_rx_buffer[2];
-    root["oilp"] = canbus_rx_buffer[3];
-    root["temp"] = canbus_rx_buffer[4];
-    root["lbse"] = canbus_rx_buffer[5]; // 0 to 100 %
-    root["rbse"] = canbus_rx_buffer[6]; // 0 to 100 %
-    root["batt"] = mapfloat(canbus_rx_buffer[7], 0, 255, 0, 25); // 0 to 25 V
+    root["rfid_auth"] = canbus_rx_buffer[1];
+    root["engine_temp"] = canbus_rx_buffer[2];
+    root["oil_pressure"] = canbus_rx_buffer[3];
+    root["cvt_temp"] = canbus_rx_buffer[4];
+    root["lbse"] = canbus_rx_buffer[5];
+    root["rbse"] = canbus_rx_buffer[6];
+    root["voltage"] = mapfloat(canbus_rx_buffer[7], 0, 255, 0, 25); // 0 to 25 V
   }
   else if (ID == VDC_ID) {
-    root["wheel"] = map(canbus_rx_buffer[1], 0, 255, -100, 100); // -100 to 100 %
-    root["steer"] = map(canbus_rx_buffer[2], 0, 255, -100, 100); // -100 to 100 %
-    root["mot1"] = mapfloat(canbus_rx_buffer[3], 0, 255, -100, 100) + 1; // -100 to 100 %
-    root["susp"] = mapfloat(canbus_rx_buffer[4], 0, 255, 0, 100); // 0 to 100 %
-    root["mot2"] = mapfloat(canbus_rx_buffer[5], 0, 255, -100, 100) + 1; // 0 to 100 %
+    root["wheel"] = map(canbus_rx_buffer[1], 0, 255, -100, 100);
+    root["steer"] = map(canbus_rx_buffer[2], 0, 255, -100, 100); 
+    root["mot1"] = map(canbus_rx_buffer[3], 0, 255, -100, 100);
+    root["susp"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
+    root["mot2"] = map(canbus_rx_buffer[5], 0, 255, -100, 100);
+    root["slot6"] = canbus_rx_buffer[6];
+    root["slot7"] = canbus_rx_buffer[7];
   }
   else if (ID == TSC_ID) {
-    root["gear"] = canbus_rx_buffer[1]; // 0,1,2,3,4 is neutral, 1st, 2nd, 3rd and reverse, respectively
-    root["slip"] = map(canbus_rx_buffer[2], 0, 255, 0, 100); // 0 to 100 %
-    root["temp"] = map(canbus_rx_buffer[3], 0, 255, -100, 100); //-100 to 100 degrees Celcius
+    root["erpm"] = canbus_rx_buffer[1]; // 0,1,2,3,4 is neutral, 1st, 2nd, 3rd and reverse, respectively
+    root["drpm"] = map(canbus_rx_buffer[2], 0, 255, 0, 100); // 0 to 100 %
+    root["slot3"] = map(canbus_rx_buffer[3], 0, 255, -100, 100); //-100 to 100 degrees Celcius
     root["cvtp"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
-    root["erpm"] = map(canbus_rx_buffer[5], 0, 255, 0, 3600); // 0 to 3600 rpm
-    root["drpm"] = map(canbus_rx_buffer[6], 0, 255, 0, 3600); // 0 to 3600 rpm
+    root["cvtt"] = map(canbus_rx_buffer[5], 0, 255, 0, 100); // 0 to 3600 rpm
+    root["gear"] = canbus_rx_buffer[6]; // 0 to 3600 rpm
     root["lock"] = canbus_rx_buffer[7]; // 0 is unlocked, 1 is locked
   }
   root.printTo(data_buffer, sizeof(data_buffer));
