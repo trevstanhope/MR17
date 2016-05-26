@@ -19,29 +19,23 @@ import sys, os
 import serial
 import binascii
 import random
-from cvme import CLORB
- 
+import cvme
+from datetime import datetime
+
+class Logger:
+    def __init__(self, fname, ftype=".csv"):
+        self.file = open(os.path.join("logs", fname + ftype), 'w')
+    def write_headers(self, d):
+        self.file.write(','.join([str(k) for k in d.iterkeys()] + ['\n']))
+    def insert_data(self, d):
+        self.file.write(','.join([str(v) for v in d.itervalues()] + ['\n']))
+
 class OBD:
-
-    def __init__(self, device_classes=['/dev/ttyUSB','/dev/ttyACM'], attempts=5, baud=9600, debug=True):
+    def __init__(self, debug=True):
         """
         """
-
-        # Connect to OBD
         self.port = None
         self.debug = debug
-        for i in range(attempts):
-            for dev in device_classes:
-                try:
-                    dev_id = dev + str(i)
-                    self.port = serial.Serial(dev_id, baud) # set self.port to the located device
-                    break
-                except Exception as e:
-                    self.port = None
-                    print str(e)
-            if self.port is not None: break
-
-        # Initialize empty data object
         self.data = {
             "slip" : 0,
             "cvt" : 0,
@@ -62,9 +56,49 @@ class OBD:
             "vel" : 0,
             "hours" : 0,
         }
+
+    # Connect to OBD
+    def attach(self, device_classes=['/dev/ttyUSB','/dev/ttyACM'], attempts=5, baud=38400):
+        """
+        """
+        if self.port is None:
+            for i in range(attempts):
+                for dev in device_classes:
+                    self.dev_id = None
+                    try:
+                        self.dev_id = dev + str(i)
+                        self.port = serial.Serial(self.dev_id, baud) # set self.port to the located device
+                        return True
+                    except Exception as e:
+                        self.port = None
+            if self.port is None:
+                raise Exception("Could not locate OBD device!")
+        else:
+            raise Exception("Port already attached!")
     
+    # Query CAN
     def query(self):
         """
+        Grab the latest data from the CANBus via the OBD gateway
+        Display requires the following keys:
+        data: {
+          vel: Float,
+          slip: Int,
+          cvt: Float,
+          rpm: Int,
+          throttle: Int,
+          load: Int,
+          temp: Int,
+          oil: Int,
+          susp: Int,
+          ballast: String,
+          lbrake: Int,
+          rbrake: Int,
+          hours: Float,
+          bat: Float,
+          user: Int,
+          lock: Boolean
+        }
         """
         if self.port is not None:
             try:
@@ -119,7 +153,11 @@ class OBD:
             pass
         return self.data
 
+    # Calculate Checksum
     def checksum(self, d, mod=256, decimals=2):
+        """
+        Returns: mod N checksum
+        """
         chksum = 0
         d = {k.encode('ascii'): v for (k, v) in d.iteritems()}
         for k,v in d.iteritems():
@@ -131,6 +169,15 @@ class OBD:
             chksum += ord(i)
         return chksum % mod
 
+    # Get Device
+    def get_device(self):
+        """
+        Returns the device ID
+        """
+        if self.dev_id is not None:
+            return self.dev_id
+        else:
+            return False
 
 # Web Interface
 class App:
@@ -139,18 +186,38 @@ class App:
         try:
             with open(config_file) as cfg:
                 self.config = json.loads(cfg.read())
-            self.mongo_client = MongoClient()
-            self.db = self.mongo_client[self.config['MONGO_NAME']]
-            self.session_key = binascii.b2a_hex(os.urandom(self.config['MONGO_KEY_LENGTH']))
-            self.session = self.db[self.session_key]
-            self.obd = OBD()
-            self.log = open(os.path.join("logs", self.session_key + ".csv"), 'w')
-            d = self.obd.query()
-            self.log.write(','.join([str(k) for k in d.iterkeys()] + ['\n']))
+            self.session_key = binascii.b2a_hex(os.urandom(self.config['SESSION_KEY_LENGTH']))
+
+            # Mongo
             try:
-                self.cvme = CLORB()
+                self.mongo_client = MongoClient()
+                self.db = self.mongo_client[self.config['MONGO_NAME']]
+                self.session = self.db[self.session_key]
+            except:
+                self.print_error('MONGO', e)
+
+            # OBD
+            try:
+                self.obd = OBD()
+                self.obd.attach()
+                self.obd.get_device()
             except Exception as e:
-                print str(e)
+                self.print_error('OBD', e)
+
+            # Logger
+            try:
+                self.log = Logger(self.session_key)
+                if self.obd.get_device() is not False:
+                    d = self.obd.query()
+                    self.log.write_headers(d)
+            except Exception as e:
+                self.print_error('LOGGER', e)
+
+            # CVME
+            try:
+                self.cvme = cvme.CLORB()
+            except Exception as e:
+                self.print_error('CVME', e)
 
             # Scheduled Tasks
             try:
@@ -158,15 +225,20 @@ class App:
             except Exception as e:
                 raise e
         except Exception as e:
-            print str(e)
+            self.print_error('SYSTEM', e)
 
     ## Listen
     def listen(self):
         try:
             d = self.obd.query()
-            self.log.write(','.join([str(v) for v in d.itervalues()] + ['\n']))
+            self.latest_data = d
+            self.log.insert_data(d)
         except Exception as e:
             print str(e)
+
+    ## Print Error
+    def print_error(self, subsystem, e):
+        print datetime.strftime(datetime.now(), "[%d/%b/%Y:%H:%H:%S]") + ' ' + subsystem + ' ' + str(e)
 
     ## Render Webapp
     @cherrypy.expose 
@@ -180,11 +252,10 @@ class App:
     def default(self, *args, **kwargs):
         """ This function the API """
         try:
-            print kwargs
-            return json.dumps(self.session.find().limit(1).sort({"$natural":-1}))
+            return json.dumps(self.latest_data) # self.session.find().limit(1).sort({"$natural":-1}))
         except Exception as e:
             raise e
-        return None
+        return {}
 
 if __name__ == '__main__':
     config_file = "settings.json"

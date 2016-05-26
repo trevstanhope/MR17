@@ -35,9 +35,18 @@ const int CVT_AMP_LIMIT = 30000; // mA
 const int CVT_DEADBAND = 50;
 const int INTERVAL = 100;
 const int SAMPLES = 1000 / INTERVAL;
-const float P_COEF = 6.0;
-const float I_COEF = 3.5;
-const float D_COEF = -3.5;
+const int CVT_LOW_RANGE = 64;
+const int CVT_MID_RANGE = 128;
+const int CVT_HIGH_RANGE = 128;
+const float P_LOW_COEF = 3.0;
+const float I_LOW_COEF = 0.0;
+const float D_LOW_COEF = 0.0;
+const float P_MID_COEF = 5.0;
+const float I_MID_COEF = 2.0;
+const float D_MID_COEF = -3.5;
+const float P_HIGH_COEF = 5.0;
+const float I_HIGH_COEF = 3.0;
+const float D_HIGH_COEF = 0;
 const int GUARD_PHOTOSENSOR_THRESHOLD = 300;
 
 /* --- Global Variables --- */
@@ -154,10 +163,21 @@ void loop() {
   int cvt_error = cvt_target - cvt_pos;
   error.add(cvt_error);
   if (!motors.getM1Fault() && motors.getM1CurrentMilliamps() < CVT_AMP_LIMIT) {
-    float P = P_COEF * cvt_error;
-    float I = I_COEF * error.getAverage();
-    float D = D_COEF * (cvt_pos - cvt_pos_last);
-    int speed = P + I + D;
+    int px = cvt_error;
+    int ix = error.getAverage();
+    int dx = cvt_pos - cvt_pos_last;
+    int speed = 0;
+    if (cvt_pos < CVT_LOW_RANGE) {
+      speed = (P_LOW_COEF * px) + (I_LOW_COEF * ix) + (D_LOW_COEF * dx);
+    }
+    else if ((cvt_pos > CVT_LOW_RANGE) && (cvt_pos <= CVT_MID_RANGE)) {
+      speed = (P_MID_COEF * px) + (I_MID_COEF * ix) + (D_MID_COEF * dx);
+    }
+    else if (cvt_pos >= CVT_MID_RANGE) {
+      speed = (P_HIGH_COEF * px) + (I_HIGH_COEF * ix) + (D_HIGH_COEF * dx);
+    }
+
+    // Ignore deadband
     if (abs(speed) < CVT_DEADBAND) {
       motors.setM1Speed(0);
     }
@@ -179,6 +199,9 @@ void loop() {
     Canbus.message_tx(TSC_PID, canbus_tx_buffer);
     unsigned int UID = Canbus.message_rx(canbus_rx_buffer);
     int ID = canbus_rx_buffer[0];
+    if (ID == ESC_A_ID) {
+      cvt_target = canbus_rx_buffer[4];
+    }
   }
   
   // Push info over Serial

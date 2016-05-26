@@ -5,6 +5,6 @@
     "MONGO_ADDR" : "127.0.0.1",
     "MONGO_PORT" : 27019,
     "MONGO_NAME" : "sessions",
-    "MONGO_KEY_LENGTH" : 15,
+    "SESSION_KEY_LENGTH" : 15,
     "POLLING_FREQ" : 0.1
 }

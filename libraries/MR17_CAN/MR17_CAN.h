@@ -1,5 +1,5 @@
 // Buffer Sizes for TX/RX
-extern const unsigned int BAUD = 9600;
+extern const unsigned int BAUD = 38400;
 extern const unsigned int OUTPUT_LENGTH = 256;
 extern const unsigned int DATA_LENGTH = 256;
 extern const unsigned int JSON_LENGTH = 512;

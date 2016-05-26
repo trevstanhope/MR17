@@ -91,7 +91,7 @@ void loop() {
   }
   root.printTo(data_buffer, sizeof(data_buffer));
   int chksum = checksum(data_buffer);
-  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d,\"canbus\":%d}", data_buffer, chksum, ID, canbus_status);
+  sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d,\"id\":%d}", data_buffer, chksum, ID);
   Serial.println(output_buffer);
 }
 

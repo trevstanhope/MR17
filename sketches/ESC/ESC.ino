@@ -18,7 +18,7 @@
 /* --- Global Constants --- */
 // Print Flags
 const bool PRINT_MAIN_INFO = false;
-const bool PRINT_THROTTLE_INFO = false;
+const bool PRINT_THROTTLE_INFO = true;
 const bool PRINT_VDC_INFO = false;
 const bool PRINT_TSC_INFO = false;
 const bool PRINT_BRAKE_INFO = false;
@@ -40,15 +40,15 @@ const int BUTTON_KILL_POUT = 32;
 // Joystick (Digital)
 const int CART_BACKWARD_PIN = 23;
 const int THROTTLE_HIGH_PIN = 25; // correct
-const int CART_MODE_PIN = 31;
+const int TRIGGER_KILL_PIN = 27; // correct
 const int PULL_MODE_PIN = 29;
-const int IGNITION_PIN = 35;
+const int CART_MODE_PIN = 31;
 const int DISPLAY_MODE_PIN = 33;
-const int TRIGGER_KILL_PIN = 27;
-const int THROTTLE_UP_PIN = 39;
+const int IGNITION_PIN = 35;
+const int THROTTLE_UP_PIN = 47;
 const int THROTTLE_DOWN_PIN = 41; // correct
 const int CART_FORWARD_PIN = 43; // correct
-const int THROTTLE_LOW_PIN = 47; // correct
+const int THROTTLE_LOW_PIN = 39; // correct
 
 // Relay Pins
 const int STOP_RELAY_PIN = 38;
@@ -103,8 +103,8 @@ const int THROTTLE_STEP = 32;
 const int THROTTLE_DEADBAND = 8;
 
 /// Joystick
-const int JOYSTICK_MAX = 430;
-const int JOYSTICK_ZERO = 705;
+const int JOYSTICK_MAX = 330;
+const int JOYSTICK_ZERO = 570;
 const int JOYSTICK_MIN = 1024;
 const int JOYSTICK_DEADBAND = 50;
 
@@ -141,8 +141,8 @@ int throttle_high = 0;
 int throttle_low = 0;
 int throttle_up = 0;
 int throttle_down = 0;
-int throttle_sp = 1024; // initialize to the minima
-int throttle_pv = 0; // initialize to the minima
+int throttle_sp = 0;
+int throttle_pv = 0;
 int cvt_sp = 0;
 float lph = 0;
 float psi = 0;
@@ -322,6 +322,10 @@ void loop() {
   cvt_sp = check_joystick(JOYSTICK_Y_PIN);
 
   // Throttle
+  int throttle_down_prev = throttle_down;
+  int throttle_up_prev = throttle_up;
+  int throttle_high_prev = throttle_high;
+  int throttle_low_prev = throttle_low;
   trigger_kill  = check_switch(TRIGGER_KILL_PIN);
   throttle_up = check_switch(THROTTLE_UP_PIN);
   throttle_down = check_switch(THROTTLE_DOWN_PIN);
@@ -333,22 +337,11 @@ void loop() {
   else if (throttle_low && !throttle_high) {
     throttle_sp = THROTTLE_MIN;
   }
-  else if (throttle_up && !throttle_down) {
-    throttle_sp = THROTTLE + THROTTLE_STEP;
+  else if (throttle_up && !throttle_down && !throttle_up_prev && (throttle_sp != THROTTLE_MAX)) {
+    throttle_sp += THROTTLE_STEP;
   }
-  else if (throttle_down && !throttle_up) {
-    throttle_sp = THROTTLE - THROTTLE_STEP;
-  }
-  else {
-    if (throttle_sp > THROTTLE_MAX) {
-      throttle_sp = THROTTLE_MAX;
-    }
-    else if (throttle_sp < THROTTLE_MIN) {
-      throttle_sp = THROTTLE_MIN;
-    }
-    else {
-      0; // do nothing
-    }
+  else if (throttle_down && !throttle_up && !throttle_down_prev && (throttle_sp != THROTTLE_MIN)) {
+    throttle_sp -= THROTTLE_STEP;
   }
 
   // Ignore throttle setpoint if trigger not engaged
@@ -456,8 +449,8 @@ void loop() {
     canbus_tx_buffer[1] = run_mode;
     canbus_tx_buffer[2] = cart_mode;
     canbus_tx_buffer[3] = pull_mode;
-    canbus_tx_buffer[4] = map(cvt_sp, 0, 1024, 0, 100);
-    canbus_tx_buffer[5] = map(throttle_sp, 0, 1024, 0, 100);
+    canbus_tx_buffer[4] = cvt_sp;
+    canbus_tx_buffer[5] = throttle_sp;
     canbus_tx_buffer[6] = left_brake;
     canbus_tx_buffer[7] = right_brake;
     Canbus.message_tx(ESC_A_PID, canbus_tx_buffer);
@@ -498,7 +491,6 @@ int set_throttle(int sp) {
   // Engage throttle actuator
   if (motors.getM2CurrentMilliamps() >  THROTTLE_MILLIAMP_THRESHOLD) {
     motors.setM2Speed(0); // disable if over-amp
-    Serial.println("AT THRESHOLD");
   }
   else {
     motors.setM2Speed(pwr);
@@ -510,20 +502,22 @@ int set_throttle(int sp) {
 /// Check Joystick
 int check_joystick(int pin) {
   int val = analogRead(pin); // read signal
-  int percent;
+  int sp;
   if (val < (JOYSTICK_ZERO - JOYSTICK_DEADBAND)) {
-    percent = map(val, JOYSTICK_ZERO - JOYSTICK_DEADBAND, JOYSTICK_MAX, 0, 100);
+    sp = map(val, JOYSTICK_ZERO - JOYSTICK_DEADBAND, JOYSTICK_MAX, 0, 255);
+    if (sp > (CANBUS_BITS)) { sp = CANBUS_BITS; }
+    if (sp < 0 ) { sp = 0; }
   }
   else {
-    percent = 0;
+    sp = 0;
   }
-  return percent;
+  return sp;
 }
 
 /// Check Brake
 int check_brake(int pin) {
   int val = analogRead(pin); // read brake signal
-  return map(val, BRAKES_MIN, BRAKES_MAX, 0, 100);
+  return map(val, BRAKES_MIN, BRAKES_MAX, 0, 255);
 }
 
 /// Set brakes
