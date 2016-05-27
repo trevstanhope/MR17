@@ -55,21 +55,21 @@ void loop() {
   // Check to see if the ID matches a known device on CAN
   if (ID == ESC_A_ID) { 
     root["run"] = canbus_rx_buffer[1];
-    root["cart"] = canbus_rx_buffer[2];
+    root["trigger"] = canbus_rx_buffer[2];
     root["pull"] = canbus_rx_buffer[3];
     root["cvt"] = canbus_rx_buffer[4];
     root["throttle"] = canbus_rx_buffer[5];
-    root["right_brake"] = canbus_rx_buffer[6]; 
-    root["left_brake"] = canbus_rx_buffer[7];
+    root["cart_mode"] = canbus_rx_buffer[6]; 
+    root["cart_dir"] = canbus_rx_buffer[7];
   }
   if (ID == ESC_B_ID) { 
-    root["rfid_auth"] = canbus_rx_buffer[1];
-    root["engine_temp"] = canbus_rx_buffer[2];
-    root["oil_pressure"] = canbus_rx_buffer[3];
-    root["cvt_temp"] = canbus_rx_buffer[4];
-    root["lbse"] = canbus_rx_buffer[5];
-    root["rbse"] = canbus_rx_buffer[6];
-    root["voltage"] = mapfloat(canbus_rx_buffer[7], 0, 255, 0, 25); // 0 to 25 V
+    root["left_brake"] = canbus_rx_buffer[1];
+    root["right_brake"] = canbus_rx_buffer[2];
+    root["temp"] = canbus_rx_buffer[3];
+    root["lph"] = canbus_rx_buffer[4];
+    root["psi"] = canbus_rx_buffer[5];
+    root["voltage"] = mapfloat(canbus_rx_buffer[6], 0, 255, 0, 25); // 0 to 25 V
+    root["rfid_auth"] = canbus_rx_buffer[7];
   }
   else if (ID == VDC_ID) {
     root["wheel"] = map(canbus_rx_buffer[1], 0, 255, -100, 100);

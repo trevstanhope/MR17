@@ -18,8 +18,8 @@
 /* --- Global Constants --- */
 // Print Flags
 const bool PRINT_MAIN_INFO = false;
-const bool PRINT_THROTTLE_INFO = true;
-const bool PRINT_VDC_INFO = false;
+const bool PRINT_THROTTLE_INFO = false;
+const bool PRINT_VDC_INFO = true;
 const bool PRINT_TSC_INFO = false;
 const bool PRINT_BRAKE_INFO = false;
 
@@ -41,11 +41,11 @@ const int BUTTON_KILL_POUT = 32;
 const int CART_BACKWARD_PIN = 23;
 const int THROTTLE_HIGH_PIN = 25; // correct
 const int TRIGGER_KILL_PIN = 27; // correct
-const int PULL_MODE_PIN = 29;
-const int CART_MODE_PIN = 31;
+const int PULL_MODE_PIN = 31;
+const int CART_MODE_PIN = 47;
 const int DISPLAY_MODE_PIN = 33;
 const int IGNITION_PIN = 35;
-const int THROTTLE_UP_PIN = 47;
+const int THROTTLE_UP_PIN = 29;
 const int THROTTLE_DOWN_PIN = 41; // correct
 const int CART_FORWARD_PIN = 43; // correct
 const int THROTTLE_LOW_PIN = 39; // correct
@@ -128,6 +128,8 @@ int trigger_kill  = 0;
 int button_kill = 0;
 int ignition = 0;
 int pull_mode = 0;
+int pull_mode_state = 0;
+int pull_mode_state_prev = 0;
 int cvt_guard = 0;
 int run_mode = 0;
 int left_brake = 0;
@@ -137,6 +139,7 @@ int display_mode = 0; // the desired display mode on the HUD
 int cart_forward = 0;
 int cart_backward = 0;
 int cart_mode = 0;
+int cart_direction = 0;
 int throttle_high = 0;
 int throttle_low = 0;
 int throttle_up = 0;
@@ -144,7 +147,10 @@ int throttle_down = 0;
 int throttle_sp = 0;
 int throttle_pv = 0;
 int cvt_sp = 0;
+int cart_mode_state = 0;
+int cart_mode_state_prev = 0;
 float lph = 0;
+int volts = 0;
 float psi = 0;
 float temperature = 0;
 int canbus_status = 0;
@@ -280,27 +286,40 @@ void loop() {
   // Check Failsafe Switches (Default to 1 if disconnected)
   hitch_kill = check_switch(HITCH_KILL_PIN);
   button_kill = check_switch(BUTTON_KILL_PIN);
-
-  // Check Seat
   seat_kill = check_seat();
 
   // Check Regular Switches (Default to 0 if disconnected)
   ignition = check_switch(IGNITION_PIN);
   display_mode = check_switch(DISPLAY_MODE_PIN);
+
+  // Check Ballast Settings
   cart_forward = check_switch(CART_FORWARD_PIN);
   cart_backward = check_switch(CART_BACKWARD_PIN);
-
-  // Change VDC and TSC modes
-  if (check_switch(CART_MODE_PIN)) {
-    if (cart_mode == 1) {
+  if (cart_forward && !cart_backward) {
+    cart_direction = 1;
+  }
+  else if (!cart_forward && cart_backward) {
+    cart_direction = 2;
+  }
+  else {
+    cart_direction = 0;
+  }
+  cart_mode_state_prev = cart_mode_state;
+  cart_mode_state = check_switch(CART_MODE_PIN);
+  if (cart_mode_state && !cart_mode_state_prev) {
+    if (cart_mode == 1)  {
       cart_mode = 0;
     }
     else {
       cart_mode = 1;
     }
   }
-  if (check_switch(PULL_MODE_PIN)) {
-    if (pull_mode == 1) {
+
+  // CVT Pull Mode
+  pull_mode_state_prev = pull_mode_state;
+  pull_mode_state = check_switch(PULL_MODE_PIN);
+  if (pull_mode_state && !pull_mode_state_prev) {
+    if (pull_mode == 1)  {
       pull_mode = 0;
     }
     else {
@@ -404,7 +423,7 @@ void loop() {
       Serial.println(output_buffer);
       Serial.flush();
     }
-  
+
     // Throttle Info
     if (PRINT_THROTTLE_INFO) {
       sprintf(data_buffer, "{'ignition':%d,'throttle_sp':%d,'throttle_pv':%d,'trigger':%d,'throttle_low':%d,'throttle_high':%d,'throttle_down':%d,'throttle_up':%d}", ignition, throttle_sp, throttle_pv, trigger_kill, throttle_low, throttle_high, throttle_down, throttle_up);
@@ -412,15 +431,15 @@ void loop() {
       Serial.println(output_buffer);
       Serial.flush();
     }
-  
+
     // Ballast Info
     if (PRINT_VDC_INFO) {
-      sprintf(data_buffer, "{'cart_mode':%d,'cart_forward':%d,'cart_backward':%d}", cart_mode, cart_forward, cart_backward);
+      sprintf(data_buffer, "{'cart_mode':%d,'cart_forward':%d,'cart_backward':%d,'cart_direction':%d}", cart_mode, cart_forward, cart_backward, cart_direction);
       sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
       Serial.println(output_buffer);
       Serial.flush();
     }
-  
+
     // CVT Info
     if (PRINT_TSC_INFO) {
       sprintf(data_buffer, "{'cvt_sp':%d,'pull_mode':%d}", cvt_sp, pull_mode);
@@ -428,7 +447,7 @@ void loop() {
       Serial.println(output_buffer);
       Serial.flush();
     }
-  
+
     // Brake Info
     if (PRINT_BRAKE_INFO) {
       sprintf(data_buffer, "{'right_brake':%d,'left_brake':%d}", right_brake, left_brake);
@@ -440,30 +459,30 @@ void loop() {
 
   // CANBus
   if (canbus_status) {
-    
+
     // Check if messages
     unsigned char UID = Canbus.message_rx(canbus_rx_buffer);
 
     // Send Message A
     canbus_tx_buffer[0] = ESC_A_ID;
     canbus_tx_buffer[1] = run_mode;
-    canbus_tx_buffer[2] = cart_mode;
+    canbus_tx_buffer[2] = trigger_kill;
     canbus_tx_buffer[3] = pull_mode;
     canbus_tx_buffer[4] = cvt_sp;
     canbus_tx_buffer[5] = throttle_sp;
-    canbus_tx_buffer[6] = left_brake;
-    canbus_tx_buffer[7] = right_brake;
+    canbus_tx_buffer[6] = cart_mode;
+    canbus_tx_buffer[7] = cart_direction;
     Canbus.message_tx(ESC_A_PID, canbus_tx_buffer);
 
-    // Send Message B (
+    // Send Message B
     canbus_tx_buffer[0] = ESC_B_ID;
-    canbus_tx_buffer[1] = lph;
-    canbus_tx_buffer[2] = temperature;
-    canbus_tx_buffer[3] = psi;
-    canbus_tx_buffer[4] = 0;
-    canbus_tx_buffer[5] = 0;
-    canbus_tx_buffer[6] = 0;
-    canbus_tx_buffer[7] = 0;
+    canbus_tx_buffer[1] = left_brake;
+    canbus_tx_buffer[2] = right_brake;
+    canbus_tx_buffer[3] = temperature;
+    canbus_tx_buffer[4] = lph;
+    canbus_tx_buffer[5] = psi;
+    canbus_tx_buffer[6] = volts;
+    canbus_tx_buffer[7] = rfid_auth;
     Canbus.message_tx(ESC_A_PID, canbus_tx_buffer);
   }
 
@@ -505,8 +524,12 @@ int check_joystick(int pin) {
   int sp;
   if (val < (JOYSTICK_ZERO - JOYSTICK_DEADBAND)) {
     sp = map(val, JOYSTICK_ZERO - JOYSTICK_DEADBAND, JOYSTICK_MAX, 0, 255);
-    if (sp > (CANBUS_BITS)) { sp = CANBUS_BITS; }
-    if (sp < 0 ) { sp = 0; }
+    if (sp > (CANBUS_BITS)) {
+      sp = CANBUS_BITS;
+    }
+    if (sp < 0 ) {
+      sp = 0;
+    }
   }
   else {
     sp = 0;
