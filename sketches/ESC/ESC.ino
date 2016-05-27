@@ -62,9 +62,9 @@ const int TEMP_SENSOR_PIN = 46; // TODO: find actual pin number
 /// Analog Input Pins
 // A0 Reserved for DualMC33936
 // A1 Reserved for DualMC33936
-const int THROTTLE_POS_PIN = A8;
+const int THROTTLE_POS_PIN = A10;
 const int THROTTLE_POS_MIN_PIN = A9;
-const int THROTTLE_POS_MAX_PIN = A10;
+const int THROTTLE_POS_MAX_PIN = A8;
 const int LEFT_BRAKE_PIN = A11;
 const int JOYSTICK_Y_PIN = A12;
 const int JOYSTICK_X_PIN = A13;
@@ -93,8 +93,8 @@ const int BRAKES_MIN = 0;
 const int BRAKES_MAX = 1024;
 
 /// Throttle
-const int THROTTLE_POS_MIN = 580;
-const int THROTTLE_POS_MAX = 1024;
+const int THROTTLE_POS_MIN = 39; // 580
+const int THROTTLE_POS_MAX = 933; // 1024
 const int THROTTLE_MIN = 0;
 const int THROTTLE_MAX = 255;
 const int THROTTLE_MILLIAMP_THRESHOLD = 10000;
