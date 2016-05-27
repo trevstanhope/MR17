@@ -38,7 +38,8 @@ class OBD:
         self.debug = debug
         self.data = {
             "slip" : 0,
-            "cvt" : 0,
+            "cvt_ratio" : 0,
+            "cvt_pct" : 0,
             "rpm" : 0,
             "gear" : 0,
             "cvt_temp" : 0,
@@ -48,13 +49,15 @@ class OBD:
             "bat" : 0,
             "user" : 0,
             "lock" : 0,
-            "engine_temp" : 0,
+            "eng_temp" : 0,
             "oil" : 0,
             "load" : 0,
             "susp" : 0,
             "ballast" : 0,
             "vel" : 0,
             "hours" : 0,
+            "belt_slip" : 0,
+            "trans_temp" : 0
         }
 
     # Connect to OBD
@@ -242,17 +245,21 @@ class App:
 
     ## Render Webapp
     @cherrypy.expose 
-    def index(self, www_dir="www", index_file="index.html"):
-	path = os.path.join(www_dir, index_file)
+    def index(self, index_file="index.html"):
+	path = os.path.join(self.config['CHERRYPY_PATH'], index_file)
         with open(path) as html: 
             return html.read()
 	
     ## Handle API Requests
     @cherrypy.expose
+    @tools.json_out()
+    @cherrypy.tools.accept(media='application/json')
     def default(self, *args, **kwargs):
         """ This function the API """
         try:
-            return json.dumps(self.latest_data) # self.session.find().limit(1).sort({"$natural":-1}))
+            if args[0] == 'api':
+                self.print_error("JSON", "Caught request from app API")
+                return self.latest_data
         except Exception as e:
             raise e
         return {}
@@ -264,6 +271,6 @@ if __name__ == '__main__':
     cherrypy.server.socket_port = 8080
     currdir = os.path.dirname(os.path.abspath(__file__))
     conf = {
-        '/': {'tools.staticdir.on':True, 'tools.staticdir.dir':os.path.join(currdir,'www')},
+        '/': {'tools.staticdir.on':True, 'tools.staticdir.dir':os.path.join(currdir,app.config['CHERRYPY_PATH'])},
     }
     cherrypy.quickstart(app, '/', config=conf)
