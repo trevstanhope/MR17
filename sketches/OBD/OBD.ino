@@ -54,10 +54,10 @@ void loop() {
   
   // Check to see if the ID matches a known device on CAN
   if (ID == ESC_A_ID) { 
-    root["run"] = canbus_rx_buffer[1];
+    root["run_mode"] = canbus_rx_buffer[1];
     root["trigger"] = canbus_rx_buffer[2];
-    root["pull"] = canbus_rx_buffer[3];
-    root["cvt"] = canbus_rx_buffer[4];
+    root["pull_mode"] = canbus_rx_buffer[3];
+    root["cvt_sp"] = canbus_rx_buffer[4];
     root["throttle"] = canbus_rx_buffer[5];
     root["cart_mode"] = canbus_rx_buffer[6]; 
     root["cart_dir"] = canbus_rx_buffer[7];
@@ -72,20 +72,20 @@ void loop() {
     root["rfid_auth"] = canbus_rx_buffer[7];
   }
   else if (ID == VDC_ID) {
-    root["wheel"] = map(canbus_rx_buffer[1], 0, 255, -100, 100);
-    root["steer"] = map(canbus_rx_buffer[2], 0, 255, -100, 100); 
+    root["steering_sp"] = map(canbus_rx_buffer[1], 0, 255, -100, 100);
+    root["steering_pv"] = map(canbus_rx_buffer[2], 0, 255, -100, 100); 
     root["mot1"] = map(canbus_rx_buffer[3], 0, 255, -100, 100);
-    root["susp"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
+    root["susp_pv"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
     root["mot2"] = map(canbus_rx_buffer[5], 0, 255, -100, 100);
     root["slot6"] = canbus_rx_buffer[6];
     root["slot7"] = canbus_rx_buffer[7];
   }
   else if (ID == TSC_ID) {
-    root["erpm"] = canbus_rx_buffer[1]; // 0,1,2,3,4 is neutral, 1st, 2nd, 3rd and reverse, respectively
-    root["drpm"] = map(canbus_rx_buffer[2], 0, 255, 0, 100); // 0 to 100 %
+    root["engine_rpm"] = canbus_rx_buffer[1]; // 0,1,2,3,4 is neutral, 1st, 2nd, 3rd and reverse, respectively
+    root["shaft_rpm"] = map(canbus_rx_buffer[2], 0, 255, 0, 100); // 0 to 100 %
     root["guard"] = canbus_rx_buffer[3]; //-100 to 100 degrees Celcius
-    root["cvtp"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
-    root["cvtt"] = map(canbus_rx_buffer[5], 0, 255, 0, 100); // 0 to 3600 rpm
+    root["cvt_pv"] = map(canbus_rx_buffer[4], 0, 255, 0, 100);
+    root["cvt_sp"] = map(canbus_rx_buffer[5], 0, 255, 0, 100); // 0 to 3600 rpm
     root["gear"] = canbus_rx_buffer[6]; // 0 to 3600 rpm
     root["lock"] = canbus_rx_buffer[7]; // 0 is unlocked, 1 is locked
   }

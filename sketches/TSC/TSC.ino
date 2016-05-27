@@ -47,7 +47,7 @@ const float D_MID_COEF = -3.5;
 const float P_HIGH_COEF = 5.0;
 const float I_HIGH_COEF = 3.0;
 const float D_HIGH_COEF = 0;
-const int GUARD_PHOTOSENSOR_THRESHOLD = 300;
+const int GUARD_PHOTOSENSOR_THRESHOLD = 200;
 
 /* --- Global Variables --- */
 volatile int engine_counter = 0;
