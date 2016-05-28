@@ -32,7 +32,7 @@ module app {
   }
 
   export function Fetch() {
-    const fileName = "/api";
+    const fileName = "http://192.168.1.2:8080/api";
     console.log(`Starting fetch for ${fileName}`);
 
     FetchInternal(fileName);

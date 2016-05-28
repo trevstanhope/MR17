@@ -12,7 +12,7 @@ var app;
         return decodeURIComponent(results[2].replace(/\+/g, " "));
     }
     function Fetch() {
-        var fileName = "/api";
+        var fileName = "http://192.168.1.2:8080/api";
         console.log("Starting fetch for " + fileName);
         FetchInternal(fileName);
     }

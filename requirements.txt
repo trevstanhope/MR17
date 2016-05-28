@@ -1,5 +1,4 @@
 pymongo==2.8
-scipy==0.16.0
 CherryPy==3.2.2
 Cython==0.15.1
 numpy==1.8.2

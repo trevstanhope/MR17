@@ -27,7 +27,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         cp $CONFIG_PATH/sources.list /etc/apt/
         apt-get update
 fi
-if [$ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
+if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
         echo "Skipping..."
 fi
@@ -96,8 +96,9 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install libavformat-dev -y -qq
         apt-get install libswscale-dev -y -qq
         apt-get install libdc1394-22-dev -y -qq
-        apt-get install libxine-dev -y -qq
-        apt-get install libgstreamer0.10-dev -y -qq
+        apt-get install libxine2-dev -y -qq
+        apt-get install libav-tools -y -qq
+	apt-get install libgstreamer0.10-dev -y -qq
         apt-get install libgstreamer-plugins-base0.10-dev -y -qq
         apt-get install libv4l-dev -y -qq
         apt-get install python-numpy -y -qq
@@ -120,9 +121,14 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install libblas-dev -y -qq
         apt-get install liblapack-dev -y -qq
         apt-get install cython -y -qq
-        apt-get install libzmq3 -y -qq
         apt-get install hostapd -y -qq
         apt-get install dnsmasq -y -qq
+	apt-get install curl -y -qq
+        apt-get install automake -y -qq
+        apt-get install autoconf -y -qq
+        apt-get install libtool -y -qq
+        apt-get install pkg-config -y -qq
+        apt-get -y install autoconf automake build-essential libass-dev libfreetype6-dev libsdl1.2-dev libtheora-dev libtool libva-dev libvdpau-dev libvorbis-dev libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev pkg-config texinfo zlib1g-dev
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -142,21 +148,14 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
 fi
 
 # NodeJS
-# https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions
-curl -sL https://deb.nodesource.com/setup_4.x | sudo -E bash -
-sudo apt-get install -y nodejs
+# ADD SECTION FOR NODE
 
 # OpenCV
 read -p "Recompile OpenCV? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
-        echo "Running fix for AVformat ..."
-        cd /usr/include/linux
-        ln -s ../libv4l1-videodev.h videodev.h
-        ln -s ../libavformat/avformat.h avformat.h
         echo "Installing OpenCV ..."
-        mkdir $BUILD_PATH && cd $BUILD_PATH
-        wget http://sourceforge.net/projects/opencvlibrary/files/opencv-unix/2.4.9/opencv-2.4.9.zip
+        cd $BUILD_PATH
         unzip -qq opencv-2.4.9.zip && cd opencv-2.4.9
         mkdir release && cd release
         cmake -D CMAKE_BUILD_TYPE=RELEASE CMAKE_INSTALL_PREFIX=/usr/local ..
