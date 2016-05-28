@@ -26,23 +26,32 @@ class Logger:
     def __init__(self, fname, ftype=".csv"):
         self.file = open(os.path.join("logs", fname + ftype), 'w')
     def write_headers(self, d):
-        self.file.write(','.join([str(k) for k in d.iterkeys()] + ['\n']))
+        self.file.write(','.join([str(k) for k,v in d.iteritems()] + ['\n']))
     def insert_data(self, d):
-        self.file.write(','.join([str(v) for v in d.itervalues()] + ['\n']))
+        self.file.write(','.join([str(v) for k,v in d.iteritems()] + ['\n']))
 
 class OBD:
-    def __init__(self, debug=True):
+    def __init__(self, debug=False):
         """
         """
         self.port = None
         self.debug = debug
-        self.data = {
+
+        # Initialize computer vision ground speed sensor
+        try:
+            self.CLORB = CLORB()
+        except:
+            self.CLORB = None
+
+        # JSON Data to be transmitted to the app over the web API
+        self.json_data = {
             "slip" : 0,
             "cvt_ratio" : 0,
+            "belt_slip" : 0,
             "cvt_pct" : 0,
             "rpm" : 0,
             "gear" : 0,
-            "cvt_temp" : 0,
+            "trans_temp" : 0,
             "throttle" : 0,
             "lbrake" : 0,
             "rbrake" : 0,
@@ -55,9 +64,45 @@ class OBD:
             "susp" : 0,
             "ballast" : 0,
             "vel" : 0,
-            "hours" : 0,
-            "belt_slip" : 0,
-            "trans_temp" : 0
+            "hours" : 0
+        }
+        
+        # ECU Data to be refreshed by querying the OBD
+        self.esc_a_data = {
+            "run_mode" : 0,
+            "trigger" : 0,
+            "pull_mode" : 0,
+            "cvt_sp" : 0,
+            "throttle" : 0,
+            "cart_mode" : 0,
+            "cart_dir" : 0
+        }
+        self.esc_b_data = {
+            "left_brake" : 0,
+            "right_brake" : 0,
+            "temp" : 0,
+            "lph" : 0,
+            "psi" : 0,
+            "voltage" : 0,
+            "rfid_auth" : 0
+        }
+        self.vdc_data = {
+            "steering_sp" : 0,
+            "steering_pv" : 0,
+            "mot1" : 0,
+            "susp_pv" : 0,
+            "mot2" : 0,
+            "slot6" : 0,
+            "slot7" : 0,
+        }
+        self.tsc_data = {
+            "engine_rpm" : 0,
+            "shaft_rpm" : 0,
+            "guard" : 0,
+            "cvt_pv" : 0,
+            "cart_sp" : 0,
+            "gear" : 0,
+            "lock" : 0
         }
 
     # Connect to OBD
@@ -80,81 +125,87 @@ class OBD:
             raise Exception("Port already attached!")
     
     # Query CAN
-    def query(self):
+    def query(self, ESC_A_ID = 9, ESC_B_ID = 10, TSC_ID = 11, VDC_ID = 12):
         """
         Grab the latest data from the CANBus via the OBD gateway
         Display requires the following keys:
-        data: {
-          vel: Float,
-          slip: Int,
-          cvt: Float,
-          rpm: Int,
-          throttle: Int,
-          load: Int,
-          temp: Int,
-          oil: Int,
-          susp: Int,
-          ballast: String,
-          lbrake: Int,
-          rbrake: Int,
-          hours: Float,
-          bat: Float,
-          user: Int,
-          lock: Boolean
-        }
+        See src/app/display.tsc for required key-values
         """
         if self.port is not None:
             try:
-                s = self.port.readline()
+                string = self.port.readline()
             except:
                 raise Exception("Failed to read from OBD")
             try:
-                j = json.loads(s) # parse JSON
+                msg = json.loads(string) # parse JSON
             except:
                 raise Exception("Failed to parse message as JSON!")
             try:
-                d = j['data'] # grab data component of string
-                chk_b = self.checksum(d) # calculate checksum
+                data = msg['data'] # grab data component of string
+                chk_b = self.checksum(data) # calculate checksum
             except:
                 raise Exception("No sensor values found in message!")
             try:
-                chk_a = int(j['chksum']) # parse checksum
+                chksum_a = int(msg['chksum']) # parse checksum
             except:
                 raise Exception("No checksum value found in message!")
-            if chk_a == chk_b:
-                self.data.update(d)
-        elif self.debug is True:
-            d_tsc = {
-                "slip" : random.randint(0, 100),
-                "cvt" : random.randint(0, 100),
+            if chksum_a == chksum_b:
+                try:
+                    id = int(msg["id"])
+                except:
+                    raise Exception("No ID for CANBUS message found!")
+                if id == TSC_ID:
+                    self.tsc_data.update(data)
+                elif id == VDC_ID:
+                    self.vdc_data.update(data)
+                elif id == ESC_A_ID:
+                    self.esc_a_data.update(data)
+                elif id == ESC_B_ID:
+                    self.esc_b_data.update(data)
+                else:
+                    raise Exception("CANBUS ID not recognized!: %d" % id)
+
+    def get_latest(self):
+        self.query() # grab latest info from CAN
+        if self.debug is True:
+            dummy_data = {
+                "belt_slip" : random.randint(0, 100),
+                "cvt_pct" : random.randint(0, 100),
+                "cvt_ratio" : round(random.uniform(0,4), 2),
                 "rpm" : random.randint(0, 3600),
                 "gear" : random.randint(-1, 3),
-                "cvt_temp" : random.randint(0, 999)
-            }
-            d_esc = {
+                "trans_temp" : round(random.uniform(25, 27), 1),
                 "throttle" : random.randint(0, 100),
                 "lbrake" : random.randint(0, 100),
                 "rbrake" : random.randint(0, 100),
                 "bat" : random.randint(0, 24),
                 "user" : random.randint(0, 255),
                 "lock" : random.randint(0, 1),
-                "engine_temp" : random.randint(0, 999),
+                "eng_temp" : random.randint(0, 999),
                 "oil" : random.randint(0, 100),
                 "load" : random.randint(0, 100),
-            }
-            d_vdc = {
                 "susp" : random.randint(0, 100),
-                "ballast" : random.randint(0, 1)
-            }
-            d_tps = {
+                "ballast" : ["Forward", "Backward", "Off"][random.randint(0, 2)],
                 "vel" : random.randint(0, 50),
+                "slip" : random.randint(0, 100),
                 "hours" : random.randint(0, 100),
             }
-            dummy_data = [d_tsc, d_esc, d_vdc, d_tps]
-            self.data.update(dummy_data[random.randint(0,len(dummy_data)-1)])
+            self.json_data.update(dummy_data)
         else:
-            pass
-        return self.data
+            if self.CLORB:
+                groundspeed = self.CLORB.get_groundspeed()
+                slip = self.calculate_slip(groundspeed)
+                self.json_data.update({"vel" : groundspeed})
+            else:
+                groundspeed = 0
+                slip = 0
+            new_data = {
+                "vel" : groundspeed,
+                "cvt_ratio" : self.calculate_cvt_ratio(),
+                "slip" : self.calculate_slip(groundspeed)
+            }
+            self.json_data.update(new_data)
+        return self.json_data
 
     # Calculate Checksum
     def checksum(self, d, mod=256, decimals=2):
@@ -181,6 +232,34 @@ class OBD:
             return self.dev_id
         else:
             return False
+
+    # Calculate Slip
+    def calculate_slip(self, ground_kmh, effective_radius=28.0):
+        gear = self.tsc_data["gear"]
+        shaft_rpm = self.tsc_data["shaft_rpm"]
+        if gear == 1:
+            ratio = 43.28
+        elif gear == 2:
+            ratio = 35.88
+        elif gear == 3:
+            ratio = 15.95
+        elif gear == 4:
+            ratio = 47.84
+        else:
+            return 0.0
+        axle_rpm = shaft_rpm / ratio
+        wheel_kmh = 2 * np.pi * (effective_radius / 1e5) * (60 * axle_rpm)
+        slip = wheel_kmh / ground_kmh 
+        return slip
+
+    def calculate_cvt_ratio(self):
+        shaft_rpm = self.tsc_data["shaft_rpm"]
+        engine_rpm = self.tsc_data["engine_rpm"]
+        if shaft_rpm == 0:
+           cvt_ratio = -1
+        else:
+           cvt_ratio = engine_rpm / shaft_rpm
+        return cvt_ratio    
 
 # Web Interface
 class App:
@@ -210,17 +289,9 @@ class App:
             # Logger
             try:
                 self.log = Logger(self.session_key)
-                if self.obd.get_device() is not False:
-                    d = self.obd.query()
-                    self.log.write_headers(d)
+                self.log.write_headers(self.obd.json_data)
             except Exception as e:
                 self.print_error('LOGGER', e)
-
-            # CVME
-            try:
-                self.cvme = cvme.CLORB()
-            except Exception as e:
-                self.print_error('CVME', e)
 
             # Scheduled Tasks
             try:
@@ -233,9 +304,8 @@ class App:
     ## Listen
     def listen(self):
         try:
-            d = self.obd.query()
-            self.latest_data = d
-            self.log.insert_data(d)
+            self.latest_data = self.obd.get_latest()
+            self.log.insert_data(self.latest_data)
         except Exception as e:
             print str(e)
 

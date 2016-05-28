@@ -9,10 +9,9 @@ module app {
         Warning: { Min: 20, Max: 40 },
         Bad: { Min: 40, Max: 100 }
       });
-    SetNumber("#cvt_ratio", data.cvt_ratio);
+    SetCVT("#cvt_ratio", data.cvt_ratio);
     SetPercentage("#cvt_pct", data.cvt_pct);
     SetNumber("#rpm", data.rpm, 0);
-
     SetPercentage("#throttle", data.throttle);
     SetPercentage(
       "#engine-loading",
@@ -38,7 +37,6 @@ module app {
         Good: { Min: 0, Max: 50 },
         Bad: { Min: 50, Max: 1000 }
       });
-
     SetPercentage("#suspension", data.susp);
     SetBallast("#ballast-state", data.ballast);
     SetPercentage(
@@ -55,12 +53,10 @@ module app {
         Good: { Min: 0, Max: 0 },
         Warning: { Min: 0, Max: 100 }
       });
-
     SetNumber("#engine-hours", data.hours, 0);
     SetBatteryVoltage("#battery-voltage", data.bat);
     SetValue("#rfid-user", data.user);
     SetValue("#differential", data.lock ? "ON" : "OFF", data.lock ? "warning" : "");
-
     SetNumber("#gear", data.gear, 0);
     SetPercentage("#belt_slip", data.belt_slip);
     SetDegrees("#trans_temp", data.trans_temp);
@@ -104,17 +100,25 @@ module app {
   }
 
   function SetBallast(selector: string, value: string): void {
-    var stringValue = "Off";
+    var stringValue = "OFF";
     switch (value) {
       case "Forward":
-        stringValue = "↑↑";
+        stringValue = "FWD";
         break;
-
       case "Backward":
-        stringValue = "↓↓";
+        stringValue = "REV";
         break;
     }
     SetValue(selector, stringValue);
+  }
+
+  function SetCVT(selector: string, value: number): void {
+    if (value == -1) {
+      SetValue(selector, "-");
+    }
+    else {
+      SetNumber(selector, value);
+    }
   }
 
   function SetBatteryVoltage(selector: string, value: number): void {

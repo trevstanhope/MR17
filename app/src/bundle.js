@@ -52,7 +52,7 @@ var app;
             Warning: { Min: 20, Max: 40 },
             Bad: { Min: 40, Max: 100 }
         });
-        SetNumber("#cvt_ratio", data.cvt_ratio);
+        SetCVT("#cvt_ratio", data.cvt_ratio);
         SetPercentage("#cvt_pct", data.cvt_pct);
         SetNumber("#rpm", data.rpm, 0);
         SetPercentage("#throttle", data.throttle);
@@ -110,16 +110,24 @@ var app;
         SetValue(selector, value.toFixed(1).toString() + " °C", RangeClassFromRanges(value, ranges));
     }
     function SetBallast(selector, value) {
-        var stringValue = "Off";
+        var stringValue = "OFF";
         switch (value) {
             case "Forward":
-                stringValue = "↑↑";
+                stringValue = "FWD";
                 break;
             case "Backward":
-                stringValue = "↓↓";
+                stringValue = "REV";
                 break;
         }
         SetValue(selector, stringValue);
+    }
+    function SetCVT(selector, value) {
+        if (value == -1) {
+            SetValue(selector, "-");
+        }
+        else {
+            SetNumber(selector, value);
+        }
     }
     function SetBatteryVoltage(selector, value) {
         var rangeClass = RangeClassFromRanges(value, {
