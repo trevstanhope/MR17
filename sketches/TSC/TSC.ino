@@ -48,6 +48,7 @@ const float P_HIGH_COEF = 5.0;
 const float I_HIGH_COEF = 3.0;
 const float D_HIGH_COEF = 0;
 const int GUARD_PHOTOSENSOR_THRESHOLD = 200;
+const int BACKUP_ALARM_LIMIT = 8;
 
 /* --- Global Variables --- */
 volatile int engine_counter = 0;
@@ -69,6 +70,7 @@ int trans_locked = 0;
 int guard_photosensor = 0;
 int chksum = 0; 
 int canbus_status = 0;
+int backup_alarm_timer = 0;
 RunningMedian engine_rpm = RunningMedian(SAMPLES);
 RunningMedian shaft_rpm = RunningMedian(SAMPLES);
 RunningMedian error = RunningMedian(SAMPLES);
@@ -184,6 +186,22 @@ void loop() {
     else {
       motors.setM1Speed(speed);
     }
+  }
+
+  // Backup Alarm
+  if (trans_gear == 4) {
+    if (backup_alarm_timer < BACKUP_ALARM_LIMIT) {
+      motors.setM2Speed(400);
+      backup_alarm_timer++;
+    }
+    else {
+      backup_alarm_timer = 0;
+      motors.setM2Speed(0);
+    }
+  }
+  else {
+    motors.setM2Speed(0);
+    backup_alarm_timer = 0;
   }
   
   // CANBus
