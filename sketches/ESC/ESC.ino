@@ -19,9 +19,9 @@
 // Print Flags
 const bool PRINT_MAIN_INFO = false;
 const bool PRINT_THROTTLE_INFO = false;
-const bool PRINT_VDC_INFO = true;
+const bool PRINT_VDC_INFO = false;
 const bool PRINT_TSC_INFO = false;
-const bool PRINT_BRAKE_INFO = false;
+const bool PRINT_BRAKE_INFO = true;
 
 /// Digital Pins
 // D21 is reserved for CANBUS
@@ -43,8 +43,8 @@ const int THROTTLE_HIGH_PIN = 25; // correct
 const int TRIGGER_KILL_PIN = 27; // correct
 const int PULL_MODE_PIN = 31;
 const int CART_MODE_PIN = 47;
-const int DISPLAY_MODE_PIN = 33;
-const int IGNITION_PIN = 35;
+const int DISPLAY_MODE_PIN = 35;
+const int START_STOP_PIN = 33;
 const int THROTTLE_UP_PIN = 29;
 const int THROTTLE_DOWN_PIN = 41; // correct
 const int CART_FORWARD_PIN = 43; // correct
@@ -62,14 +62,15 @@ const int TEMP_SENSOR_PIN = 46; // TODO: find actual pin number
 /// Analog Input Pins
 // A0 Reserved for DualMC33936
 // A1 Reserved for DualMC33936
-const int THROTTLE_POS_PIN = A10;
-const int THROTTLE_POS_MIN_PIN = A9;
+const int PSI_SENSOR_PIN = A7;
 const int THROTTLE_POS_MAX_PIN = A8;
-const int LEFT_BRAKE_PIN = A11;
+const int THROTTLE_POS_MIN_PIN = A9;
+const int THROTTLE_POS_PIN = A10;
+const int RIGHT_BRAKE_PIN = A11;
 const int JOYSTICK_Y_PIN = A12;
 const int JOYSTICK_X_PIN = A13;
-const int PSI_SENSOR_PIN = A14;
-const int RIGHT_BRAKE_PIN = A15;
+const int BRAKE_POS_PIN = A14;
+const int LEFT_BRAKE_PIN = A15;
 
 /* --- Global Settings --- */
 /// RFID
@@ -79,7 +80,7 @@ const int RFID_SEARCH = 0x01;
 const int RFID_READ = 0x02;
 
 /// Time Delays
-const int KILL_WAIT = 500;
+const int KILL_WAIT = 5000;
 const int IGNITION_WAIT = 200;
 const int MOTORS_WAIT = 100;
 const int STANDBY_WAIT = 5;
@@ -91,6 +92,8 @@ const int BRAKES_MILLIAMP_THRESH = 30000;
 const int BRAKES_DEADBAND = 10;
 const int BRAKES_MIN = 0;
 const int BRAKES_MAX = 1024;
+const int BRAKE_POS_MIN = 30;
+const int BRAKE_POS_MAX = 200;
 
 /// Throttle
 const int THROTTLE_POS_MIN = 39; // 580
@@ -98,9 +101,9 @@ const int THROTTLE_POS_MAX = 933; // 1024
 const int THROTTLE_MIN = 0;
 const int THROTTLE_MAX = 255;
 const int THROTTLE_MILLIAMP_THRESHOLD = 10000;
-const int THROTTLE_GAIN = 50;
+const int THROTTLE_GAIN = 45;
 const int THROTTLE_STEP = 32;
-const int THROTTLE_DEADBAND = 8;
+const int THROTTLE_DEADBAND = 16;
 
 /// Joystick
 const int JOYSTICK_MAX = 330;
@@ -126,7 +129,7 @@ int seat_kill = 0;
 int hitch_kill = 0;
 int trigger_kill  = 0;
 int button_kill = 0;
-int ignition = 0;
+int start_stop = 0;
 int pull_mode = 0;
 int pull_mode_state = 0;
 int pull_mode_state_prev = 0;
@@ -134,6 +137,8 @@ int cvt_guard = 0;
 int run_mode = 0;
 int left_brake = 0;
 int right_brake = 0;
+int brakes_pwr = 0;
+int brakes_pv = 0;
 int rfid_auth = 0;
 int display_mode = 0; // the desired display mode on the HUD
 int cart_forward = 0;
@@ -235,7 +240,7 @@ void setup() {
   digitalWrite(BUTTON_KILL_POUT, LOW);
 
   // Joystick Digital Input
-  pinMode(IGNITION_PIN, INPUT);
+  pinMode(START_STOP_PIN, INPUT);
   pinMode(TRIGGER_KILL_PIN, INPUT);
   pinMode(PULL_MODE_PIN, INPUT);
   pinMode(CART_FORWARD_PIN, INPUT);
@@ -263,6 +268,7 @@ void setup() {
   digitalWrite(RIGHT_BRAKE_PIN, LOW);
   pinMode(LEFT_BRAKE_PIN, INPUT);
   digitalWrite(LEFT_BRAKE_PIN, LOW);
+  pinMode(BRAKE_POS_PIN, INPUT);
 
   // DualMC33926MotorShield Motor Controller
   motors.init();
@@ -289,7 +295,7 @@ void loop() {
   seat_kill = check_seat();
 
   // Check Regular Switches (Default to 0 if disconnected)
-  ignition = check_switch(IGNITION_PIN);
+  start_stop = check_switch(START_STOP_PIN);
   display_mode = check_switch(DISPLAY_MODE_PIN);
 
   // Check Ballast Settings
@@ -335,7 +341,7 @@ void loop() {
   // Brakes
   left_brake = check_brake(LEFT_BRAKE_PIN);
   right_brake = check_brake(RIGHT_BRAKE_PIN);
-  set_brakes(right_brake, left_brake);
+  brakes_pv = set_brakes();
 
   // CVT
   cvt_sp = check_joystick(JOYSTICK_Y_PIN);
@@ -373,7 +379,7 @@ void loop() {
 
   // (0) If OFF
   if (run_mode == 0) {
-    if (rfid_auth != 0 && !seat_kill) {
+    if (!seat_kill && !hitch_kill) {
       standby();
     }
   }
@@ -382,8 +388,8 @@ void loop() {
     if ( seat_kill || hitch_kill ) {
       kill(); // kill engine
     }
-    else if (ignition && left_brake && right_brake) {
-      start(); // execute ignition sequence
+    else if (start_stop && left_brake && right_brake) {
+      start(); // execute start_stop sequence
     }
     else {
       standby(); // remain in standby (run_mode 1)
@@ -391,12 +397,10 @@ void loop() {
   }
   // (2) If DRIVE
   else if (run_mode == 2) {
-    if (seat_kill || hitch_kill ) {
+    if (seat_kill || hitch_kill || start_stop) {
       kill(); // kill engine
       standby();
-    }
-    if (ignition) {
-      start();
+      run_mode = 0;
     }
     else {
       /* STUFF PERTAINING TO run_mode 2 */
@@ -426,7 +430,7 @@ void loop() {
 
     // Throttle Info
     if (PRINT_THROTTLE_INFO) {
-      sprintf(data_buffer, "{'ignition':%d,'throttle_sp':%d,'throttle_pv':%d,'trigger':%d,'throttle_low':%d,'throttle_high':%d,'throttle_down':%d,'throttle_up':%d}", ignition, throttle_sp, throttle_pv, trigger_kill, throttle_low, throttle_high, throttle_down, throttle_up);
+      sprintf(data_buffer, "{'start_stop':%d,'throttle_sp':%d,'throttle_pv':%d,'trigger':%d,'throttle_low':%d,'throttle_high':%d,'throttle_down':%d,'throttle_up':%d}", start_stop, throttle_sp, throttle_pv, trigger_kill, throttle_low, throttle_high, throttle_down, throttle_up);
       sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
       Serial.println(output_buffer);
       Serial.flush();
@@ -450,7 +454,7 @@ void loop() {
 
     // Brake Info
     if (PRINT_BRAKE_INFO) {
-      sprintf(data_buffer, "{'right_brake':%d,'left_brake':%d}", right_brake, left_brake);
+      sprintf(data_buffer, "{'right_brake':%d,'left_brake':%d,'brakes_pwr':%d,'brake_milliamp':%d,'brakes_pv:%d'}", right_brake, left_brake, brakes_pwr, brakes_milliamp, brakes_pv);
       sprintf(output_buffer, "{\"data\":%s,\"chksum\":%d}", data_buffer, checksum(data_buffer));
       Serial.println(output_buffer);
       Serial.flush();
@@ -544,20 +548,23 @@ int check_brake(int pin) {
 }
 
 /// Set brakes
-int set_brakes(int right_brake, int left_brake) {
+int set_brakes(void) {
 
   // Map the brake values for DualVNH5019 output
-  int output; // (left_brake + right_brake) / 2;
-  if (left_brake > BRAKES_DEADBAND) {
-    output = 400;
+  int pv = analogRead(BRAKE_POS_PIN);
+  int sp = right_brake; // (left_brake + right_brake) / 2;
+  int error = sp - pv;
+  if (error > BRAKES_DEADBAND) {
+    brakes_pwr = 400;
   }
   else {
-    output = -400;
+    brakes_pwr = -400;
   }
 
   // Engage brakes
   brakes_milliamp = motors.getM1CurrentMilliamps();
-  motors.setM1Speed(output);
+  motors.setM1Speed(brakes_pwr);
+  return pv;
 }
 
 /// Check Switch
@@ -604,7 +611,7 @@ int checksum(char* buf) {
 /// Check Seat
 // Returns 1 if seat is empty, checks for SEAT_LIMIT iterations before activating
 int check_seat(void) {
-  if (!digitalRead(SEAT_KILL_PIN)) {
+  if (digitalRead(SEAT_KILL_PIN)) {
     seat_counter++;
   }
   else {
@@ -623,6 +630,7 @@ void kill(void) {
   digitalWrite(STOP_RELAY_PIN, HIGH);
   digitalWrite(REGULATOR_RELAY_PIN, HIGH);
   digitalWrite(STARTER_RELAY_PIN, HIGH);
+  delay(KILL_WAIT);
   run_mode = 0;
 }
 
@@ -635,12 +643,12 @@ void standby(void) {
   run_mode = 1;
 }
 
-/// Ignition
+/// Start / Stop
 void start(void) {
   motors.setM1Speed(0);
   motors.setM2Speed(0);
   delay(MOTORS_WAIT);
-  while (check_switch(IGNITION_PIN)) {
+  while (check_switch(START_STOP_PIN)) {
     digitalWrite(STOP_RELAY_PIN, LOW);
     digitalWrite(REGULATOR_RELAY_PIN, LOW);
     digitalWrite(STARTER_RELAY_PIN, LOW);

@@ -142,18 +142,19 @@ class OBD:
                 raise Exception("Failed to parse message as JSON!")
             try:
                 data = msg['data'] # grab data component of string
-                chk_b = self.checksum(data) # calculate checksum
+                checksum_b = self.checksum(data) # calculate checksum
             except:
                 raise Exception("No sensor values found in message!")
             try:
-                chksum_a = int(msg['chksum']) # parse checksum
+                checksum_a = int(msg['chksum']) # parse checksum
             except:
                 raise Exception("No checksum value found in message!")
-            if chksum_a == chksum_b:
+            if checksum_a == checksum_b:
                 try:
                     id = int(msg["id"])
                 except:
                     raise Exception("No ID for CANBUS message found!")
+#                self.print_msg(data)
                 if id == TSC_ID:
                     self.tsc_data.update(data)
                 elif id == VDC_ID:
@@ -164,6 +165,11 @@ class OBD:
                     self.esc_b_data.update(data)
                 else:
                     raise Exception("CANBUS ID not recognized!: %d" % id)
+                self.print_msg("Updated ID%d values" % id)
+
+    def print_msg(self, msg):
+        print datetime.strftime(datetime.now(), "[%d/%b/%Y:%H:%H:%S]") + ' CANBUS ' + str(msg)
+
 
     def get_latest(self):
         self.query() # grab latest info from CAN
@@ -196,15 +202,35 @@ class OBD:
                 groundspeed = self.CLORB.get_groundspeed()
                 slip = self.calculate_slip(groundspeed)
                 self.json_data.update({"vel" : groundspeed})
-            else:
-                groundspeed = 0
-                slip = 0
-            new_data = {
-                "vel" : groundspeed,
-                "cvt_ratio" : self.calculate_cvt_ratio(),
-                "slip" : self.calculate_slip(groundspeed)
-            }
-            self.json_data.update(new_data)
+                self.json_data.update({"slip" : self.calculate_slip(groundspeed)}) 
+
+            # VDC
+            self.json_data.update({                
+                "susp" : self.vdc_data["susp_pv"],
+            })
+
+            # ESC-A
+            self.json_data.update({
+                "throttle" : self.esc_a_data["throttle"],
+            })
+
+            # ESC-B
+            self.json_data.update({
+                "rbrake" : self.esc_b_data["right_brake"],
+                "lbrake" : self.esc_b_data["left_brake"],
+                "eng_temp" : self.esc_b_data["temp"],
+                "lph" : self.esc_b_data["lph"],
+                "oil" : self.esc_b_data["psi"]
+            })
+
+            # TSC
+            self.json_data.update({
+                "gear" : self.tsc_data["gear"],
+                "cvt_pct" : self.tsc_data["cvt_pv"],
+                "gear" : self.tsc_data["gear"],
+                "rpm" : self.tsc_data["engine_rpm"],
+                "cvt_ratio" : self.calculate_cvt_ratio()
+            })
         return self.json_data
 
     # Calculate Checksum
@@ -269,6 +295,7 @@ class App:
             with open(config_file) as cfg:
                 self.config = json.loads(cfg.read())
             self.session_key = binascii.b2a_hex(os.urandom(self.config['SESSION_KEY_LENGTH']))
+            self.latest_data = {}
 
             # Mongo
             try:
